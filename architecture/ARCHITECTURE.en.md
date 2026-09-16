@@ -255,7 +255,24 @@ DEC-022.** The meta-tools/search pattern remains future work outside this phase.
 
 ## 7. Permissions and Policy Engine
 
-**PROPOSAL** (already sketched in Phase 0, kept and refined here):
+**DECISION (DEC-023 to DEC-029, Phase 5):** the origin and granularity of risk classification,
+rule engine, result shape, schema-change invalidation, persistence, and configuration/location of
+the Policy Engine are already decided — see `decisions/DECISIONS.md`. Summary: a three-tier risk
+classification (`read-only`/`reversible-write`/`destructive`) declared explicitly by the user in
+the Policy Engine's **own configuration**, indexed by `identity` — **important correction to the
+original PROPOSAL below:** the classification does NOT live in the Tool Registry or in
+`ToolEntry` (that would have required modifying the model approved in DEC-013/DEC-016); it lives
+in a dedicated Policy Engine file, never inferred nor self-declared by the origin MCP server
+(DEC-023). Constant per `identity`, using the reasonable worst case when a tool's impact varies by
+argument — modulating risk by argument is out of scope for this phase (DEC-023b). A rule engine
+derived from risk with simple `allow`/`deny` overrides per `identity`, no expressive rule language
+(DEC-024, resolves the OPEN QUESTION below). A ternary result with a structured reason (DEC-025).
+Automatic invalidation of approval on `schemaFingerprint` change, no compatibility heuristic
+(DEC-026). No persistence/auditing of its own (DEC-027). Configuration in its own JSON file, in
+`packages/core/src/policy/`, no dedicated package (DEC-028, DEC-029).
+
+**PROPOSAL (historical context, Phase 1 — see DEC-023 to DEC-029 above for what is now decided,
+including the correction on where risk classification lives):**
 
 - Claude Code's local permission engine (`.claude/settings.json`, allow/ask/deny rules) is **not
   duplicated** — it remains the authority for the agent's local actions
@@ -268,17 +285,18 @@ DEC-022.** The meta-tools/search pattern remains future work outside this phase.
      requires confirmation.
   3. **Destructive / high impact** → synchronous human confirmation always, no exceptions, no
      "auto-approve after N successful runs".
-- Each tool's risk classification lives in the Tool Registry (§5), not inferred at runtime — this
-  avoids ambiguity and makes policy statically auditable.
+- ~~Each tool's risk classification lives in the Tool Registry (§5)~~ — **corrected by DEC-023: it
+  lives in the Policy Engine's own configuration, not in the Tool Registry or `ToolEntry`**,
+  precisely to avoid modifying the model already approved in DEC-013/DEC-016.
 - **FACT/VERIFIED, applied as a design principle:** enforcement of this policy lives in code the
   LLM cannot alter, never only as a prompt instruction — consistent with the distinction Anthropic
   itself draws between CLAUDE.md (guidance) and settings/hooks (hard enforcement)
   (`docs/research/CLAUDE-CODE-ANALYSIS.md` §2, §10).
 
-**OPEN QUESTION:** whether the Policy Engine needs its own rule language (even a simple one) or
-whether the three-tier classification + flat allowlists are enough for phase 1. **Preliminary
-PROPOSAL:** start without a dedicated rule language (flat allowlists per tool+host are enough for
-the initial volume), revisit if something more expressive is needed as the catalog grows.
+~~**OPEN QUESTION:** whether the Policy Engine needs its own rule language (even a simple one) or
+whether the three-tier classification + flat allowlists are enough for phase 1.~~ — **resolved in
+Phase 5, see DEC-024**: no expressive rule language, risk-derived engine + simple per-`identity`
+overrides.
 
 ---
 
@@ -581,7 +599,8 @@ during implementation)
    **resolved in Phase 3, see DEC-013, DEC-014, DEC-017** (own MCP-compatible model in
    `packages/shared`; declarative config + non-authoritative cache; module in
    `packages/core/src/registry/`, no dedicated package).
-4. Policy Engine rule language: flat allowlists or something more expressive? (§7)
+4. ~~Policy Engine rule language: flat allowlists or something more expressive? (§7)~~ —
+   **resolved in Phase 5, see DEC-023 to DEC-029.**
 5. ~~Exact IPC mechanism between AgentForge Core and the Secrets Broker (§3, §8, §18)~~ —
    **resolved in Phase 2, see DEC-010** (Windows named pipe / Linux-macOS Unix domain socket,
    behind an agnostic transport interface in `packages/shared`).

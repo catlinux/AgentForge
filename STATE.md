@@ -12,32 +12,35 @@ copiar).
 
 ## Fase actual
 
-**Fase 4 — Tool Discovery**
+**Fase 5 — Permission / Policy Engine**
 
-**Estado:** COMPLETADA (2026-09-16) — 5 decisiones aprobadas (DEC-018 a DEC-022: estrategia de
-reducción estática por configuración, configuración declarativa propia, salida por proyección
-reducida `DiscoveredToolView`, exclusión automática de `stale`, y ubicación dentro de
-`packages/core`). Implementación completa con tests. Ver `decisions/DECISIONS.md` para el registro
-formal.
+**Estado:** COMPLETADA (2026-09-16) — 7 decisiones aprobadas (DEC-023 a DEC-029, incluye
+DEC-023b: origen/granularidad de la clasificación de riesgo en configuración propia —nunca en
+`ToolEntry`—, motor de reglas derivado del riesgo con overrides simples, resultado ternario con
+razón estructurada, invalidación automática por cambio de `schemaFingerprint`, sin
+persistencia/auditoría propia, configuración JSON propia, ubicación dentro de `packages/core`).
+Implementación completa con tests. Ver `decisions/DECISIONS.md` para el registro formal.
 
-**Implementación:** Tool Discovery funcional, de solo lectura sobre el Registry (Fase 3): modelo
-`DiscoveredToolView` en `packages/shared/src/discovery/`; `DiscoveryConfig`/`loadDiscoveryConfig`,
-`DiscoveryStrategy`/`StaticConfigDiscoveryStrategy`, y `discoverTools` (excluye `stale`, aplica
-estrategia, proyecta a vista reducida) en `packages/core/src/discovery/`. Fase 3 (Tool Registry,
-DEC-013 a DEC-017) sigue vigente y sin cambios — `ToolEntry` y el Registry no se han tocado.
+**Implementación:** Policy Engine funcional, de solo lectura sobre el Registry (Fase 3) e
+independiente de Discovery (Fase 4): modelo `RiskLevel`/`PolicyDecision` en
+`packages/shared/src/policy/`; `PolicyConfig`/`loadPolicyConfig`,
+`PolicyApprovalStore`/`InMemoryPolicyApprovalStore`, y `evaluate` (aplica DEC-023/DEC-023b/
+DEC-024/DEC-026) en `packages/core/src/policy/`. Fases 3 y 4 siguen vigentes y sin cambios —
+`ToolEntry`, Registry y Discovery no se han tocado.
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
 **Arquitectura:** BASE ARQUITECTÓNICA APROBADA (Fase 1: DEC-003 a DEC-007) + ESTRUCTURA NÚCLEO
 APROBADA (Fase 2: DEC-008 a DEC-012) + TOOL REGISTRY APROBADO E IMPLEMENTADO (Fase 3: DEC-013 a
-DEC-017) + TOOL DISCOVERY APROBADO E IMPLEMENTADO (Fase 4: DEC-018 a DEC-022). Resto documentado
-como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
+DEC-017) + TOOL DISCOVERY APROBADO E IMPLEMENTADO (Fase 4: DEC-018 a DEC-022) + POLICY ENGINE
+APROBADO E IMPLEMENTADO (Fase 5: DEC-023 a DEC-029). Resto documentado como PROPOSAL/OPEN QUESTION
+en `architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 4 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
-tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 5 (Policy
-Engine) — sin implementar nada todavía.
+Fase 5 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
+tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 6 (Secrets
+Broker) — sin implementar nada todavía.
 
 ## Trabajo completado
 
@@ -279,6 +282,67 @@ decisión automática.
       `dist/`/`node_modules/`/`*.tsbuildinfo` correctamente ignorados; `git diff` confirma que
       Registry (Fase 3) no fue tocado.
 
+### Fase 5 — Permission / Policy Engine (completada, 2026-09-16)
+- [x] Análisis completo de la fase presentado en una única respuesta agrupada (objetivo/alcance,
+      relación con Registry/Discovery, flujo de evaluación, 7 decisiones con
+      alternativas/ventajas/desventajas/impacto, límites explícitos, riesgos, cambios de
+      documentación/tests) — sin preguntas individuales, según lo pedido.
+- [x] Aclaración adicional a petición del usuario antes de aprobar: de dónde procede exactamente
+      la clasificación de riesgo (4 alternativas analizadas: configuración propia del Policy
+      Engine, variante de fichero único, inferencia automática —descartada—, autodeclaración del
+      servidor MCP —descartada—) y cómo se determina el riesgo cuando una misma tool tiene
+      distinto impacto según argumentos (nueva decisión DEC-023b: constante por `identity`, peor
+      caso razonable, sin modular por argumento).
+- [x] **DEC-023** — Origen del riesgo: 3 niveles (`read-only`/`reversible-write`/`destructive`),
+      declarados explícitamente por el usuario en configuración propia del Policy Engine, por
+      `identity` — nunca en `ToolEntry`, nunca inferido ni autodeclarado. Sin clasificar →
+      `requires-confirmation` por defecto.
+- [x] **DEC-023b** — Granularidad constante por `identity`, peor caso razonable; modulación por
+      argumento fuera de esta fase (documentado explícitamente como limitación conocida).
+- [x] **DEC-024** — Motor de reglas: derivado del riesgo, con overrides simples `allow`/`deny` por
+      `identity` — sin lenguaje de reglas expresivo.
+- [x] **DEC-025** — Resultado ternario (`allow`/`deny`/`requires-confirmation`) con razón
+      estructurada (regla aplicada, riesgo base, `identity`, `schemaFingerprint`).
+- [x] **DEC-026** — Invalidación automática de aprobación ante cualquier cambio de
+      `schemaFingerprint`, sin heurística de compatibilidad.
+- [x] **DEC-027** — Sin persistencia ni eventos de auditoría propios del Policy Engine.
+- [x] **DEC-028** — Configuración declarativa en fichero JSON propio, separado de Registry y
+      Discovery.
+- [x] **DEC-029** — Ubicación: `packages/core/src/policy/`, sin paquete propio.
+- [x] Detalle de implementación resuelto con el usuario antes de escribir código (no decidido
+      silenciosamente): el registro mínimo de "último `schemaFingerprint` aprobado por `identity`"
+      necesario para DEC-026 vive **solo en memoria** (`InMemoryPolicyApprovalStore`), no persiste
+      entre reinicios — coherente al pie de la letra con DEC-027; tras un reinicio del proceso
+      Core, toda `identity` vuelve a requerir confirmación la primera vez (fricción aceptada, no
+      inseguridad).
+- [x] `decisions/DECISIONS.md`, `STATE.md`, `ROADMAP.md`, `DEVELOPMENT.md`,
+      `architecture/ARCHITECTURE.md`/`.en.md` (§7 y §20) sincronizados con DEC-023 a DEC-029,
+      incluyendo la corrección explícita de que la clasificación de riesgo NO vive en el Tool
+      Registry (contradiciendo una PROPOSAL heredada de Fase 1 que sí lo sugería).
+- [x] Implementación: `packages/shared/src/policy/` — `risk.ts` (`RiskLevel`), `decision.ts`
+      (`PolicyVerdict`, `PolicyRuleApplied`, `PolicyDecision`). `packages/core/src/policy/` —
+      `config.ts` (`PolicyConfig`, `loadPolicyConfig`), `approval-store.ts`
+      (`PolicyApprovalStore`, `InMemoryPolicyApprovalStore`), `evaluate.ts` (`evaluate`: aplica
+      invalidación por fingerprint → overrides → riesgo por defecto, en ese orden).
+- [x] Tests (Vitest): 17 nuevos — 11 de `evaluate` (DEC-023 no clasificado, DEC-024 los 3 niveles
+      de riesgo y ambos overrides, DEC-023b constancia por `identity`, DEC-026 invalidación por
+      cambio de fingerprint y no-invalidación en primera evaluación, DEC-025 forma del resultado,
+      no-mutación de `ToolEntry`); 2 de `loadPolicyConfig`; 3 de `InMemoryPolicyApprovalStore`
+      (incluye no-persistencia entre instancias, confirmando DEC-027); 1 test explícito de
+      independencia del Policy Engine respecto a Discovery (una `identity` ausente de la lista
+      activa de Discovery se evalúa igual).
+- [x] Alcance respetado: no se ejecutan tools, no se implementa mecanismo de confirmación humana,
+      Secrets Broker funcional, Audit Log persistente, Sessions, ni adaptador MCP real. `ToolEntry`,
+      `identity`, `schemaFingerprint` (DEC-013/DEC-016) y los módulos de Registry/Discovery quedan
+      intactos (verificado por `git diff` vacío sobre esos ficheros).
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 3 paquetes (tras corregir un error de
+      indexación por branded type `ToolIdentity` en un test, tipado, no lógica); `pnpm run lint`
+      sin errores; `pnpm run format` correcto (tras `--write` sobre 1 fichero de test); `pnpm run
+      test` — 39/39 tests correctos (17 nuevos + 22 previos); `pnpm run build` correcto; `pnpm
+      install --frozen-lockfile` correcto (sin dependencias nuevas); grep de secretos sin
+      coincidencias; `dist/`/`node_modules/`/`*.tsbuildinfo` correctamente ignorados; `git diff`
+      confirma que Registry y Discovery no fueron tocados.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -330,6 +394,15 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
   internos.
 - **DEC-021** — Exclusión automática de entradas `stale` en Discovery.
 - **DEC-022** — Ubicación del Discovery: `packages/core/src/discovery/`, sin paquete propio.
+- **DEC-023** — Origen del riesgo: configuración propia del Policy Engine, por `identity`, nunca
+  en `ToolEntry`.
+- **DEC-023b** — Granularidad constante por `identity`, peor caso razonable.
+- **DEC-024** — Motor de reglas derivado del riesgo, overrides simples `allow`/`deny`.
+- **DEC-025** — Resultado ternario con razón estructurada.
+- **DEC-026** — Invalidación automática de aprobación ante cambio de `schemaFingerprint`.
+- **DEC-027** — Sin persistencia ni auditoría propia del Policy Engine.
+- **DEC-028** — Configuración declarativa en JSON propio, separado de Registry y Discovery.
+- **DEC-029** — Ubicación: `packages/core/src/policy/`, sin paquete propio.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -421,29 +494,30 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `1399053f80f27729b2543c62b8bc42a5f8d6c38d` (corto: `1399053`)
+- Hash: `624581e60f5e165e702d0de4ca5c2c125f0395ab` (corto: `624581e`)
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `feat+docs: implementa el Tool Registry — Fase 3 (DEC-013 a DEC-017)`
-- Contenido: 19 archivos, 813 inserciones/51 eliminaciones — modelo de datos del Registry en
-  `packages/shared/src/registry/` (identity, fingerprint, tool); store + resolución de identidad
-  en `packages/core/src/registry/` (store, file-store, resolve) con 15 tests; `DEVELOPMENT.md`,
-  `ROADMAP.md`, `STATE.md`, `architecture/ARCHITECTURE.md`/`.en.md`, `decisions/DECISIONS.md`
-  (actualizados con DEC-013 a DEC-017).
-- Commits anteriores: `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef`
-  (Fase 0 + Fase 0.5).
+- Mensaje: `feat+docs: implementa el Tool Discovery — Fase 4 (DEC-018 a DEC-022)`
+- Contenido: 17 archivos, 418 inserciones/40 eliminaciones — modelo `DiscoveredToolView` en
+  `packages/shared/src/discovery/`; `DiscoveryConfig`/`DiscoveryStrategy`/
+  `StaticConfigDiscoveryStrategy`/`discoverTools` en `packages/core/src/discovery/` con 7 tests
+  nuevos (22 en total); `DEVELOPMENT.md`, `ROADMAP.md`, `STATE.md`,
+  `architecture/ARCHITECTURE.md`/`.en.md`, `decisions/DECISIONS.md` (actualizados con DEC-018 a
+  DEC-022).
+- Commits anteriores: `1399053` (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17`
+  (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
 
 ## Estado del push
 
 - **Realizado** (2026-09-16, con autorización explícita del usuario). `master` sincronizado con
-  `origin/master` (`1399053`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
+  `origin/master` (`624581e`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
   al mismo hash).
 
 ## Próxima acción recomendada
 
-1. Pedir autorización explícita para el commit+push de los cambios de la Fase 4 (DEC-018 a
-   DEC-022, implementación del Tool Discovery, documentación sincronizada).
+1. Pedir autorización explícita para el commit+push de los cambios de la Fase 5 (DEC-023 a
+   DEC-029, implementación del Policy Engine, documentación sincronizada).
 2. Tras el commit/push, presentar únicamente el resumen de objetivos y decisiones a analizar de la
-   Fase 5 (Policy Engine) — sin implementar nada de esa fase todavía.
+   Fase 6 (Secrets Broker) — sin implementar nada de esa fase todavía.
 3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
    `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`.

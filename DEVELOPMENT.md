@@ -69,6 +69,28 @@ tratamiento de `stale`, y ubicación del Tool Discovery — ver `decisions/DECIS
 - **Entradas `stale`:** excluidas automáticamente del resultado (DEC-021).
 - **Ubicación:** `packages/core/src/discovery/`, sin paquete propio (DEC-022).
 
+**DECIDIDO (DEC-023 a DEC-029, Fase 5, 2026-09-16):** origen/granularidad del riesgo, motor de
+reglas, resultado, invalidación por schema, persistencia, configuración, y ubicación del Policy
+Engine — ver `decisions/DECISIONS.md`.
+
+- **Riesgo:** 3 niveles (`read-only`, `reversible-write`, `destructive`), declarados
+  explícitamente por el usuario en configuración propia del Policy Engine, indexados por
+  `identity` — nunca en `ToolEntry`, nunca inferidos ni autodeclarados por el servidor MCP.
+  `identity` sin clasificación → `requires-confirmation` por defecto (DEC-023).
+- **Granularidad:** constante por `identity`, según el peor caso razonable — la modulación de
+  riesgo por argumentos de la invocación queda fuera de esta fase (DEC-023b).
+- **Motor de reglas:** derivado del riesgo (`read-only`→`allow`, `reversible-write`→`allow` salvo
+  override, `destructive`→`requires-confirmation` por defecto), con overrides simples
+  `allow`/`deny` por `identity` — sin lenguaje de reglas expresivo (DEC-024).
+- **Resultado:** ternario (`allow`/`deny`/`requires-confirmation`) con razón estructurada: regla
+  aplicada, riesgo base, `identity`, `schemaFingerprint` (DEC-025).
+- **Invalidación:** cualquier cambio de `schemaFingerprint` invalida la aprobación previa de esa
+  `identity`, sin heurística de compatibilidad (DEC-026).
+- **Persistencia:** ninguna — el Policy Engine no persiste ni emite eventos de auditoría
+  (DEC-027).
+- **Configuración:** fichero JSON propio, separado de Registry y Discovery (DEC-028).
+- **Ubicación:** `packages/core/src/policy/`, sin paquete propio (DEC-029).
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando

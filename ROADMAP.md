@@ -15,7 +15,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 2 | Arquitectura núcleo | **En curso** — 5 decisiones aprobadas (DEC-008 a DEC-012), esqueleto todavía no creado |
 | 3 | Tool Registry | **En curso** — 5 decisiones aprobadas (DEC-013 a DEC-017) |
 | 4 | Tool Discovery | **En curso** — 5 decisiones aprobadas (DEC-018 a DEC-022) |
-| 5 | Permission / Policy Engine | Propuesta, no iniciada |
+| 5 | Permission / Policy Engine | **En curso** — 7 decisiones aprobadas (DEC-023 a DEC-029, incluye DEC-023b) |
 | 6 | Secrets Broker | Propuesta, no iniciada |
 | 7 | Ejecución remota / SSH | Propuesta, no iniciada |
 | 8 | Integración MCP | Propuesta, no iniciada |
@@ -77,7 +77,14 @@ de ellas.
   (`DiscoveredToolView`, sin exponer `identity` interna), exclusión automática de entradas
   `stale`, y ubicación dentro de `packages/core` sin paquete propio.
 - **Fase 5 — Permission / Policy Engine**: clasificación de acciones por riesgo/reversibilidad y
-  aplicación de política fuera del control del modelo.
+  aplicación de política fuera del control del modelo. 7 decisiones aprobadas (DEC-023 a DEC-029,
+  ver `decisions/DECISIONS.md`): clasificación de riesgo de 3 niveles declarada explícitamente por
+  el usuario en configuración propia (nunca en `ToolEntry`, nunca inferida ni autodeclarada por el
+  servidor MCP), constante por `identity` según el peor caso razonable (DEC-023b — la modulación
+  por argumentos queda fuera de esta fase); motor de reglas derivado del riesgo con overrides
+  simples `allow`/`deny` por `identity`; resultado ternario con razón estructurada; invalidación
+  automática de aprobación ante cambio de `schemaFingerprint`; sin persistencia/auditoría propia;
+  configuración en fichero JSON propio; ubicación dentro de `packages/core`.
 - **Fase 6 — Secrets Broker**: gestión de credenciales (claves SSH, tokens) nunca expuestas
   directamente al agente.
 - **Fase 7 — Ejecución remota / SSH**: ejecutor SSH controlado y auditado hacia Debian de casa y

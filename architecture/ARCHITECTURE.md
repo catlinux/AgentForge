@@ -259,7 +259,25 @@ DEC-022.** El patrón de meta-tools/búsqueda sigue siendo trabajo futuro fuera 
 
 ## 7. Permisos y Policy Engine
 
-**PROPOSAL** (ya esbozado en Fase 0, mantenido y precisado aquí):
+**DECISIÓN (DEC-023 a DEC-029, Fase 5):** origen y granularidad de la clasificación de riesgo,
+motor de reglas, forma del resultado, invalidación por cambio de schema, persistencia, y
+configuración/ubicación del Policy Engine ya están decididos — ver `decisions/DECISIONS.md`.
+Resumen: clasificación de riesgo de 3 niveles (`read-only`/`reversible-write`/`destructive`)
+declarada explícitamente por el usuario en **configuración propia del Policy Engine**, indexada
+por `identity` — **precisión importante sobre la PROPOSAL original de abajo:** la clasificación
+NO vive en el Tool Registry ni en `ToolEntry` (eso habría requerido modificar el modelo aprobado
+en DEC-013/DEC-016); vive en un fichero propio del Policy Engine, nunca inferida ni autodeclarada
+por el servidor MCP de origen (DEC-023). Constante por `identity`, usando el peor caso razonable
+cuando una tool tiene impactos distintos según argumentos — la modulación de riesgo por argumento
+queda fuera de esta fase (DEC-023b). Motor de reglas derivado del riesgo con overrides simples
+`allow`/`deny` por `identity`, sin lenguaje de reglas expresivo (DEC-024, resuelve la OPEN QUESTION
+de abajo). Resultado ternario con razón estructurada (DEC-025). Invalidación automática de
+aprobación ante cambio de `schemaFingerprint`, sin heurística de compatibilidad (DEC-026). Sin
+persistencia/auditoría propia (DEC-027). Configuración en JSON propio, en
+`packages/core/src/policy/`, sin paquete propio (DEC-028, DEC-029).
+
+**PROPOSAL (contexto histórico, Fase 1 — ver DEC-023 a DEC-029 arriba para lo ya decidido, incluida
+la corrección sobre dónde vive la clasificación de riesgo):**
 
 - **No se duplica** el motor de permisos local de Claude Code (`.claude/settings.json`, reglas
   allow/ask/deny) — sigue siendo la autoridad para acciones locales del agente
@@ -273,18 +291,18 @@ DEC-022.** El patrón de meta-tools/búsqueda sigue siendo trabajo futuro fuera 
      explícita; si no, requiere confirmación.
   3. **Destructivo / alto impacto** → confirmación humana síncrona siempre, sin excepciones ni
      "auto-aprobar tras N ejecuciones correctas".
-- La clasificación de riesgo de cada herramienta vive en el Tool Registry (§5), no se infiere en
-  tiempo de ejecución — evita ambigüedad y hace la política auditable estáticamente.
+- ~~La clasificación de riesgo de cada herramienta vive en el Tool Registry (§5)~~ — **corregido
+  por DEC-023: vive en configuración propia del Policy Engine, no en el Tool Registry ni en
+  `ToolEntry`**, precisamente para no modificar el modelo ya aprobado en DEC-013/DEC-016.
 - **FACT/VERIFIED** (aplicado como principio): la aplicación de esta política vive en código que
   el LLM no puede alterar, nunca solo como instrucción de prompt — coherente con la distinción que
   Anthropic mismo marca entre CLAUDE.md (guía) y settings/hooks (aplicación forzosa)
   (`docs/research/CLAUDE-CODE-ANALYSIS.md` §2, §10).
 
-**OPEN QUESTION:** si el Policy Engine necesita un lenguaje de reglas propio (aunque sea simple)
-o si basta con la clasificación de 3 niveles + allowlists planas para la fase 1. **PROPOSAL
-preliminar:** empezar sin lenguaje de reglas dedicado (allowlists planas por herramienta+host es
-suficiente para el volumen inicial), revisar si se necesita algo más expresivo cuando el catálogo
-crezca.
+~~**OPEN QUESTION:** si el Policy Engine necesita un lenguaje de reglas propio (aunque sea simple)
+o si basta con la clasificación de 3 niveles + allowlists planas para la fase 1.~~ — **resuelto en
+Fase 5, ver DEC-024**: sin lenguaje de reglas expresivo, motor derivado del riesgo + overrides
+simples por `identity`.
 
 ---
 
@@ -596,7 +614,8 @@ fases posteriores o al implementar)
    (§5)~~ — **resuelto en Fase 3, ver DEC-013, DEC-014, DEC-017** (modelo propio MCP-compatible en
    `packages/shared`; configuración declarativa + caché no autoritativa; módulo en
    `packages/core/src/registry/`, sin paquete propio).
-4. Lenguaje de reglas del Policy Engine: ¿allowlists planas o algo más expresivo? (§7)
+4. ~~Lenguaje de reglas del Policy Engine: ¿allowlists planas o algo más expresivo? (§7)~~ —
+   **resuelto en Fase 5, ver DEC-023 a DEC-029.**
 5. ~~Mecanismo concreto de IPC entre AgentForge Core y el Secrets Broker (§3, §8, §18)~~ —
    **resuelto en Fase 2, ver DEC-010** (named pipe en Windows / Unix domain socket en Linux-macOS,
    tras interfaz agnóstica en `packages/shared`).

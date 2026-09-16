@@ -427,6 +427,149 @@ Format per a cada decisió futura:
   proceso/seguridad que justifique un paquete separado; extraerlo después, si hiciera falta, queda
   barato por los límites de módulo ya claros.
 
+## DEC-023 — Origen y clasificación de riesgo del Policy Engine (Fase 5)
+
+- Fecha: 2026-09-16
+- Contexto: el análisis inicial de Fase 5 mencionó un "metadato de riesgo" en `ToolEntry` sin
+  especificar su origen, lo cual entraba en conflicto con el límite explícito de no modificar el
+  modelo `ToolEntry`/`identity`/`schemaFingerprint` aprobado en DEC-013/DEC-016. El usuario pidió
+  aclarar explícitamente de dónde procede la clasificación de riesgo antes de aprobar el conjunto.
+- Opciones consideradas: (1) metadato de configuración propio del Policy Engine, separado de
+  `ToolEntry`, indexado por `identity`; (2) declarado junto a la configuración de reglas (variante
+  de formato de la opción 1, no alternativa arquitectónica distinta); (3) inferido
+  automáticamente a partir del nombre/descripción/schema de la tool; (4) autodeclarado por el
+  servidor MCP de origen.
+- Decisión: **(1)**. Clasificación de riesgo de **tres niveles** (`read-only`,
+  `reversible-write`, `destructive`), **declarada explícitamente por el usuario en configuración
+  propia del Policy Engine** (no en `ToolEntry`), **indexada por `identity`** (nunca por
+  `qualifiedName` a secas, mismo principio de DEC-016). Una `identity` sin clasificación explícita
+  recibe por defecto el tratamiento más conservador: `requires-confirmation`. El Policy Engine
+  **nunca** confía en autodeclaración del servidor MCP de origen ni en heurísticas de
+  nombre/descripción/schema como fuente de verdad de riesgo.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa, tras análisis explícito de las 4
+  alternativas y sus implicaciones de seguridad/mantenimiento/compatibilidad con DEC-013 a
+  DEC-022).
+- Consecuencias: `ToolEntry`, `identity` y `schemaFingerprint` (DEC-013/DEC-016) permanecen
+  intactos — el Policy Engine los consume por lectura, nunca los modifica ni añade campos.
+  Requiere que el usuario clasifique manualmente cada `identity` nueva; el valor conservador por
+  defecto evita que una tool no clasificada quede accesible sin fricción.
+
+## DEC-023b — Granularidad constante por `identity` de la clasificación de riesgo (Fase 5)
+
+- Fecha: 2026-09-16
+- Contexto: una misma tool puede tener impacto muy distinto según sus argumentos (p. ej.
+  `delete_file(path="/tmp/x")` frente a `delete_file(path="/")`). Había que decidir si el riesgo se
+  modula por invocación o se mantiene constante por `identity`, sin reabrir la decisión ya tomada
+  en DEC-024 de no implementar un lenguaje de reglas expresivo.
+- Opciones consideradas: (A2-1) riesgo base constante por `identity`, usando el peor caso
+  razonable; (A2-2) override simple basado en coincidencia de argumentos; (A2-3) lenguaje de
+  reglas expresivo completo (equivalente a la opción ya descartada en DEC-024).
+- Decisión: **(A2-1)**. La clasificación de riesgo es **constante por `identity`** en esta fase —
+  sin modulación automática por los argumentos de una invocación concreta. Cuando una tool pueda
+  tener impactos distintos según sus argumentos, debe clasificarse según su **peor caso
+  razonable**.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: **limitación documentada explícitamente**: el riesgo es una clasificación base
+  por `identity`, no una clasificación por invocación. La modulación de riesgo según argumentos
+  queda fuera de esta fase — no se reabre DEC-024 (sigue sin lenguaje de reglas expresivo ni
+  condiciones sobre argumentos). Coherente con el resto de reglas conservadoras de la fase (DEC-023,
+  DEC-026): ante ambigüedad, se prefiere fricción (confirmación/clasificación más estricta) a una
+  heurística que podría clasificar mal un caso destructivo como seguro.
+
+## DEC-024 — Motor de reglas del Policy Engine (Fase 5)
+
+- Fecha: 2026-09-16
+- Contexto: pregunta abierta heredada de Fase 1 (`ARCHITECTURE.md` §20, punto 4: "¿allowlists
+  planas o algo más expresivo?"). Había que decidir el mecanismo que traduce la clasificación de
+  riesgo (DEC-023) en una decisión de autorización.
+- Opciones consideradas: (B1) allowlist plana por `identity`/`qualifiedName` como mecanismo
+  primario; (B2) reglas derivadas de la clasificación de riesgo como mecanismo primario, con
+  overrides tipo allowlist/denylist como capa adicional; (B3) lenguaje de reglas expresivo
+  (condiciones sobre argumentos, patrones, etc.).
+- Decisión: **(B2)**. Mecanismo primario: `read-only` → `allow` automático; `reversible-write` →
+  `allow` (sujeto a que no exista un override de denegación); `destructive` →
+  `requires-confirmation` por defecto. Capa adicional: overrides simples `allow`/`deny` por
+  `identity`, sin condiciones sobre argumentos ni lenguaje de reglas expresivo.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: evita mantenimiento manual de una allowlist exhaustiva (B1 puro) sin la
+  complejidad de un motor de reglas expresivo (B3, sin caso de uso demostrado todavía) — mismo
+  principio de evitar complejidad prematura ya aplicado en DEC-014/DEC-018. Un futuro
+  multiusuario/lenguaje de reglas más expresivo queda como evolución posible, no bloqueante ahora.
+
+## DEC-025 — Forma del resultado de evaluación del Policy Engine (Fase 5)
+
+- Fecha: 2026-09-16
+- Contexto: había que definir el contrato de salida que consumirán la futura ejecución (Fase 7) y
+  el futuro Audit Log (Fase 10), evitando tener que rediseñarlo una vez que ambas fases dependan de
+  él.
+- Opciones consideradas: (C1) resultado binario `allow`/`deny`; (C2) resultado ternario
+  `allow`/`deny`/`requires-confirmation`, sin implementar el mecanismo de confirmación en sí; (C3)
+  ternario + razón estructurada (regla aplicada, riesgo base evaluado, `identity`,
+  `schemaFingerprint`).
+- Decisión: **(C3)**. Resultado ternario con razón estructurada, incluyendo como mínimo: regla
+  aplicada, riesgo base evaluado, `identity` evaluada, y `schemaFingerprint` evaluado.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: el Policy Engine no implementa el mecanismo de confirmación humana (sigue como
+  pregunta abierta, `ARCHITECTURE.md` §20 punto 2) — solo produce la señal. La razón estructurada
+  es directamente consumible por un futuro Audit Log sin rediseño del contrato.
+
+## DEC-026 — Invalidación de aprobación ante cambio de `schemaFingerprint` (Fase 5)
+
+- Fecha: 2026-09-16
+- Contexto: DEC-016 dejó explícitamente pendiente para esta fase decidir qué ocurre cuando el
+  `schemaFingerprint` de una `identity` cambia respecto al evaluado la última vez.
+- Opciones consideradas: (D1) cualquier cambio de fingerprint invalida automáticamente cualquier
+  aprobación previa; (D2) solo un cambio "incompatible" (heurística sobre el schema) invalida la
+  aprobación; (D3) el cambio nunca invalida automáticamente, solo se notifica.
+- Decisión: **(D1)**. Cualquier cambio de `schemaFingerprint` respecto al último evaluado para esa
+  `identity` invalida automáticamente la aprobación previa — sin heurística de compatibilidad.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: cierra el vector de seguridad ya identificado en DEC-016 (caso 9: un servidor
+  comprometido podría cambiar silenciosamente el contrato de una tool ya aprobada). Puede generar
+  fricción tras actualizaciones benignas de un servidor MCP — aceptado como coste del
+  comportamiento conservador por defecto.
+
+## DEC-027 — Persistencia y auditoría del Policy Engine (Fase 5)
+
+- Fecha: 2026-09-16
+- Contexto: había que decidir si el Policy Engine debía anticipar el futuro Audit Log (Fase 10)
+  persistiendo o emitiendo eventos de las decisiones que toma.
+- Opciones consideradas: (E1) no registra nada, solo devuelve la decisión; (E2) escribe
+  directamente a algún almacenamiento de auditoría, anticipando Fase 10; (E3) emite un
+  evento/callback observable en memoria, sin persistencia.
+- Decisión: **(E1)**. El Policy Engine no persiste ni emite eventos de auditoría — solo devuelve
+  el resultado estructurado (DEC-025) a quien lo invoque.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: evita tomar de forma prematura y silenciosa decisiones de almacenamiento que
+  pertenecen a Fase 10 (todavía pendiente, `ARCHITECTURE.md` §20 punto 7). El consumo del
+  resultado (hacia Fase 7 o un futuro Fase 10) se decide en esas fases futuras.
+
+## DEC-028 — Configuración declarativa del Policy Engine (Fase 5)
+
+- Fecha: 2026-09-16
+- Contexto: había que decidir si la clasificación de riesgo y los overrides viven en un fichero
+  propio o reutilizan el de Discovery (DEC-019), aplicando el mismo principio de separación de
+  responsabilidades por documento ya usado entre Registry (DEC-014) y Discovery (DEC-019).
+- Opciones consideradas: (F1) fichero JSON propio para el Policy Engine; (F2) reutilizar el
+  fichero de configuración de Discovery añadiendo campos de política.
+- Decisión: **(F1)**. Fichero JSON propio y separado, en `packages/core/src/policy/`, distinto del
+  de orígenes del Registry y del de Discovery.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: mantiene "qué existe" (Registry), "qué se expone" (Discovery) y "qué está
+  autorizado" (Policy Engine) como responsabilidades documentalmente separadas, coherente con la
+  frontera de DEC-015.
+
+## DEC-029 — Ubicación del Policy Engine en el monorepo (Fase 5)
+
+- Fecha: 2026-09-16
+- Contexto: mismo razonamiento que DEC-017/DEC-022 — evaluar si el Policy Engine justifica un
+  paquete propio o debe vivir dentro de `packages/core`.
+- Opciones consideradas: (A) paquete propio; (B) módulo dentro de `packages/core`.
+- Decisión: **(B)**. El Policy Engine vive en `packages/core/src/policy/`, sin paquete propio.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: mismas que DEC-017/DEC-022 — no existe hoy ninguna razón de aislamiento de
+  proceso/seguridad que justifique un paquete separado.
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -458,6 +601,14 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 - ~~Forma de salida del Tool Discovery (Fase 4)~~ → DEC-020.
 - ~~Tratamiento de entradas stale en Tool Discovery (Fase 4)~~ → DEC-021.
 - ~~Ubicación del Tool Discovery en el monorepo (Fase 4)~~ → DEC-022.
+- ~~Origen y clasificación de riesgo del Policy Engine (Fase 5)~~ → DEC-023.
+- ~~Granularidad constante por identity de la clasificación de riesgo (Fase 5)~~ → DEC-023b.
+- ~~Motor de reglas del Policy Engine (Fase 5)~~ → DEC-024.
+- ~~Forma del resultado de evaluación del Policy Engine (Fase 5)~~ → DEC-025.
+- ~~Invalidación de aprobación ante cambio de schemaFingerprint (Fase 5)~~ → DEC-026.
+- ~~Persistencia y auditoría del Policy Engine (Fase 5)~~ → DEC-027.
+- ~~Configuración declarativa del Policy Engine (Fase 5)~~ → DEC-028.
+- ~~Ubicación del Policy Engine en el monorepo (Fase 5)~~ → DEC-029.
 
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):
