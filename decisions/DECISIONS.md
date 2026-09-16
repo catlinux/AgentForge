@@ -349,6 +349,84 @@ Format per a cada decisió futura:
   p. ej. Fase 9 — Sessions, o multiusuario futuro) queda barato porque el modelo de datos ya vive
   en `packages/shared` y el módulo tiene límites internos claros desde el principio.
 
+## DEC-018 — Estrategia de reducción del Tool Discovery (Fase 4)
+
+- Fecha: 2026-09-16
+- Contexto: había que decidir cómo Tool Discovery reduce el catálogo completo del Registry a un
+  subconjunto expuesto al agente, sin invadir responsabilidades de fases posteriores (uso/
+  historial pertenece a Audit Log, Fase 10; relevancia semántica requeriría una dependencia nueva
+  no justificada al tamaño actual del proyecto).
+- Opciones consideradas: (A1) filtro estático por configuración; (A2) basada en uso/heurística
+  (requiere telemetría inexistente hoy); (A3) relevancia semántica (embeddings); (A4) híbrida por
+  capas con una estrategia base más una interfaz abierta a añadir otras.
+- Decisión: **(A1) filtro estático por configuración**, con la interfaz interna diseñada como
+  (A4) — abierta a añadir estrategias adicionales combinables más adelante sin rediseño. No se
+  implementan A2 ni A3 en esta fase.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: Discovery no depende de que exista telemetría de uso (Fase 10) ni de una
+  dependencia de embeddings. Queda documentado explícitamente como una limitación conocida y
+  temporal, no como diseño final — añadir A2/A3 en el futuro es aditivo sobre la interfaz de
+  estrategia, no un rediseño.
+
+## DEC-019 — Configuración declarativa del Tool Discovery (Fase 4)
+
+- Fecha: 2026-09-16
+- Contexto: había que decidir si la configuración de qué tools se exponen reutiliza el mismo
+  fichero de orígenes del Registry (DEC-014) o vive en un fichero propio, para no mezclar la
+  responsabilidad de "qué orígenes existen" (Registry) con "qué se expone al agente" (Discovery).
+- Opciones consideradas: (B1) reutilizar el fichero de configuración de orígenes de Registry,
+  añadiendo un campo de activación; (B2) fichero de configuración propio y separado.
+- Decisión: **(B2)**. Fichero de configuración propio de Discovery, en JSON (mismo formato que
+  DEC-014), separado del fichero de orígenes del Registry.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: refuerza la frontera Registry/Discovery también a nivel de configuración, no solo
+  de código. Establece el patrón de un fichero de configuración por responsabilidad, aplicable
+  también cuando el Policy Engine (Fase 5) necesite el suyo.
+
+## DEC-020 — Forma de salida del Tool Discovery (Fase 4)
+
+- Fecha: 2026-09-16
+- Contexto: había que decidir si Discovery expone `ToolEntry` completos (incluyendo `identity`
+  interna y `schemaFingerprint`) o una proyección reducida, respetando que el agente es un
+  componente potencialmente no confiable (DEC-003) y que `identity` se diseñó como opaca e interna
+  (DEC-016).
+- Opciones consideradas: (C1) devolver `ToolEntry` completo; (C2) proyección reducida propia
+  (`DiscoveredToolView`), sin campos internos de identidad ni acoplada al formato MCP.
+- Decisión: **(C2)**. Discovery expone una proyección reducida propia, no `ToolEntry` ni el
+  formato `tools/list` de MCP directamente — misma razón de fondo que DEC-013 (no acoplar el
+  dominio interno a un protocolo externo).
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: el agente nunca ve `identity` ni `schemaFingerprint` en bruto. El futuro adaptador
+  MCP (Fase 8) se simplifica, porque solo traduce formato, sin decidir qué ocultar.
+
+## DEC-021 — Tratamiento de entradas `stale` en Tool Discovery (Fase 4)
+
+- Fecha: 2026-09-16
+- Contexto: había que decidir si las entradas marcadas `stale` (DEC-016 — no vistas en el último
+  descubrimiento del Registry) se excluyen automáticamente del resultado de Discovery o quedan a
+  criterio de cada estrategia de reducción.
+- Opciones consideradas: (D1) exclusión automática por defecto; (D2) inclusión, dejando la
+  decisión a la estrategia de reducción.
+- Decisión: **(D1)**. Las entradas `stale` se excluyen automáticamente del resultado de Discovery,
+  sin que cada estrategia deba reimplementarlo.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: coherente con la semántica de `stale` ya aprobada en DEC-016 — mientras no se
+  confirme que una tool sigue existiendo en su origen, no se ofrece al agente para uso.
+
+## DEC-022 — Ubicación del Tool Discovery en el monorepo (Fase 4)
+
+- Fecha: 2026-09-16
+- Contexto: mismo razonamiento que DEC-017 para el Registry — evaluar si Tool Discovery justifica
+  un paquete propio o debe vivir dentro de `packages/core`.
+- Opciones consideradas: (A) paquete propio; (B) módulo dentro de `packages/core`.
+- Decisión: **(B)**. Discovery vive en `packages/core/src/discovery/`, como módulo hermano de
+  `packages/core/src/registry/`, consumiendo el modelo de `packages/shared`. No se crea paquete
+  propio.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: mismas que DEC-017 — no existe hoy ninguna razón de aislamiento de
+  proceso/seguridad que justifique un paquete separado; extraerlo después, si hiciera falta, queda
+  barato por los límites de módulo ya claros.
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -375,6 +453,11 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 - ~~Alcance estático/dinámico del Tool Registry (Fase 3)~~ → DEC-015.
 - ~~Identidad y versionado de una tool (Fase 3)~~ → DEC-016.
 - ~~Ubicación del Tool Registry en el monorepo (Fase 3)~~ → DEC-017.
+- ~~Estrategia de reducción del Tool Discovery (Fase 4)~~ → DEC-018.
+- ~~Configuración declarativa del Tool Discovery (Fase 4)~~ → DEC-019.
+- ~~Forma de salida del Tool Discovery (Fase 4)~~ → DEC-020.
+- ~~Tratamiento de entradas stale en Tool Discovery (Fase 4)~~ → DEC-021.
+- ~~Ubicación del Tool Discovery en el monorepo (Fase 4)~~ → DEC-022.
 
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):

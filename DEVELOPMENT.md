@@ -57,6 +57,18 @@ identidad/versionado y ubicación del Tool Registry — ver `decisions/DECISIONS
 - **Ubicación:** `packages/core/src/registry/`, modelo de datos en `packages/shared`, sin paquete
   `packages/registry` propio (DEC-017).
 
+**DECIDIDO (DEC-018 a DEC-022, Fase 4, 2026-09-16):** estrategia, configuración, salida,
+tratamiento de `stale`, y ubicación del Tool Discovery — ver `decisions/DECISIONS.md`.
+
+- **Estrategia:** filtro estático por configuración, con interfaz abierta a estrategias
+  adicionales (uso/historial, relevancia semántica) no implementadas todavía (DEC-018).
+- **Configuración:** fichero JSON propio, separado del fichero de orígenes del Registry
+  (DEC-019).
+- **Salida:** proyección reducida propia (`DiscoveredToolView`), sin `identity` interna ni
+  acoplamiento directo a MCP (DEC-020).
+- **Entradas `stale`:** excluidas automáticamente del resultado (DEC-021).
+- **Ubicación:** `packages/core/src/discovery/`, sin paquete propio (DEC-022).
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando

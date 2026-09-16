@@ -12,33 +12,32 @@ copiar).
 
 ## Fase actual
 
-**Fase 3 — Tool Registry**
+**Fase 4 — Tool Discovery**
 
-**Estado:** COMPLETADA (2026-09-16) — 5 decisiones aprobadas (DEC-013 a DEC-017: modelo de datos
-MCP-compatible, almacenamiento en config declarativa + caché no autoritativa, alcance
-estático+dinámico con frontera Registry/Discovery/Policy Engine, identidad
-`identity`/`qualified name`/`schema fingerprint` con reglas de no-herencia, y ubicación dentro de
-`packages/core`). Implementación completa con tests cubriendo los 9 escenarios de identidad
-analizados. Ver `decisions/DECISIONS.md` para el registro formal.
+**Estado:** COMPLETADA (2026-09-16) — 5 decisiones aprobadas (DEC-018 a DEC-022: estrategia de
+reducción estática por configuración, configuración declarativa propia, salida por proyección
+reducida `DiscoveredToolView`, exclusión automática de `stale`, y ubicación dentro de
+`packages/core`). Implementación completa con tests. Ver `decisions/DECISIONS.md` para el registro
+formal.
 
-**Implementación:** Tool Registry funcional (sin conexión real a servidores MCP todavía — eso es
-Fase 8): modelo de datos en `packages/shared/src/registry/` (`identity`, `qualified name`,
-`schema fingerprint`, `ToolEntry`, `ToolContract`, `ToolOrigin`); `ToolRegistryStore` (interfaz) y
-`FileToolRegistryStore` (implementación en fichero JSON) + `resolveDiscoveredTool` (lógica de
-resolución de identidad DEC-016) en `packages/core/src/registry/`. Fase 2 (monorepo, DEC-008 a
-DEC-012) sigue vigente y sin cambios estructurales.
+**Implementación:** Tool Discovery funcional, de solo lectura sobre el Registry (Fase 3): modelo
+`DiscoveredToolView` en `packages/shared/src/discovery/`; `DiscoveryConfig`/`loadDiscoveryConfig`,
+`DiscoveryStrategy`/`StaticConfigDiscoveryStrategy`, y `discoverTools` (excluye `stale`, aplica
+estrategia, proyecta a vista reducida) en `packages/core/src/discovery/`. Fase 3 (Tool Registry,
+DEC-013 a DEC-017) sigue vigente y sin cambios — `ToolEntry` y el Registry no se han tocado.
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
 **Arquitectura:** BASE ARQUITECTÓNICA APROBADA (Fase 1: DEC-003 a DEC-007) + ESTRUCTURA NÚCLEO
 APROBADA (Fase 2: DEC-008 a DEC-012) + TOOL REGISTRY APROBADO E IMPLEMENTADO (Fase 3: DEC-013 a
-DEC-017). Resto documentado como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
+DEC-017) + TOOL DISCOVERY APROBADO E IMPLEMENTADO (Fase 4: DEC-018 a DEC-022). Resto documentado
+como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 3 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
-tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 4 (Tool
-Discovery) — sin implementar nada todavía.
+Fase 4 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
+tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 5 (Policy
+Engine) — sin implementar nada todavía.
 
 ## Trabajo completado
 
@@ -242,6 +241,44 @@ decisión automática.
       secretos/credenciales sobre todo el código nuevo — sin coincidencias; `dist/`,
       `node_modules/`, `*.tsbuildinfo` correctamente ignorados, no aparecen en `git status`.
 
+### Fase 4 — Tool Discovery (completada, 2026-09-16)
+- [x] Análisis completo de la fase: objetivo/alcance, componentes que intervienen, arquitectura y
+      flujo, 5 decisiones (estrategia de reducción, configuración declarativa, forma de salida,
+      tratamiento de `stale`, ubicación en el monorepo) con alternativas/ventajas/desventajas/
+      impacto en fases posteriores, límites explícitos de no-implementación, riesgos frente a
+      DEC-013–017, y cambios de documentación/tests previstos — presentado en una única respuesta
+      agrupada, sin preguntas individuales, según lo pedido.
+- [x] **DEC-018** — Estrategia de reducción: filtro estático por configuración, interfaz abierta a
+      estrategias adicionales (uso/historial, relevancia semántica) no implementadas todavía.
+- [x] **DEC-019** — Configuración declarativa: fichero JSON propio, separado del de orígenes del
+      Registry.
+- [x] **DEC-020** — Salida: proyección reducida propia (`DiscoveredToolView`), sin `identity` ni
+      `schemaFingerprint` internos, sin acoplamiento directo a MCP.
+- [x] **DEC-021** — Exclusión automática de entradas `stale` (DEC-016) del resultado.
+- [x] **DEC-022** — Ubicación: `packages/core/src/discovery/`, sin paquete propio (mismo
+      razonamiento que DEC-017).
+- [x] `decisions/DECISIONS.md`, `STATE.md`, `ROADMAP.md`, `DEVELOPMENT.md`,
+      `architecture/ARCHITECTURE.md`/`.en.md` (§6 y §20) sincronizados con DEC-018 a DEC-022.
+- [x] Implementación: `packages/shared/src/discovery/` — `view.ts` (`DiscoveredToolView`).
+      `packages/core/src/discovery/` — `config.ts` (`DiscoveryConfig`, `loadDiscoveryConfig`),
+      `strategy.ts` (interfaz `DiscoveryStrategy`), `static-strategy.ts`
+      (`StaticConfigDiscoveryStrategy`), `discover.ts` (`discoverTools`: lee del
+      `ToolRegistryStore`, excluye `stale`, aplica estrategia, proyecta a vista reducida).
+- [x] Tests (Vitest): 7 nuevos — 5 de `discoverTools` (catálogo vacío, filtro activo/inactivo,
+      exclusión de `stale` incluso si está activo en config, forma de la proyección de salida sin
+      campos internos, no-mutación del store — Discovery es estrictamente de solo lectura); 2 de
+      `loadDiscoveryConfig` (carga desde fichero, valor por defecto si falta el campo).
+- [x] Alcance respetado: no se ha implementado Policy Engine (Fase 5), ejecución (Fase 7),
+      Secrets Broker funcional (Fase 6), adaptador MCP real (Fase 8), ni telemetría/historial de
+      uso. `ToolEntry` y el resto del Registry de Fase 3 quedan intactos, sin ninguna
+      modificación (verificado por `git diff` vacío sobre esos ficheros).
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 3 paquetes; `pnpm run lint` sin
+      errores; `pnpm run format` correcto sin necesidad de autofix; `pnpm run test` — 22/22 tests
+      correctos (15 de Fase 3 + 7 nuevos de Fase 4); `pnpm run build` correcto; `pnpm install
+      --frozen-lockfile` correcto (sin dependencias nuevas); grep de secretos sin coincidencias;
+      `dist/`/`node_modules/`/`*.tsbuildinfo` correctamente ignorados; `git diff` confirma que
+      Registry (Fase 3) no fue tocado.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -286,6 +323,13 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-016** — Identidad: `identity`/`qualified name`/`schema fingerprint`, no-herencia
   automática.
 - **DEC-017** — Ubicación: `packages/core/src/registry/`, sin paquete propio.
+- **DEC-018** — Estrategia de reducción del Discovery: filtro estático por configuración.
+- **DEC-019** — Configuración declarativa del Discovery: fichero JSON propio, separado del
+  Registry.
+- **DEC-020** — Salida del Discovery: proyección reducida `DiscoveredToolView`, sin campos
+  internos.
+- **DEC-021** — Exclusión automática de entradas `stale` en Discovery.
+- **DEC-022** — Ubicación del Discovery: `packages/core/src/discovery/`, sin paquete propio.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -377,30 +421,29 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `4e01064d50462f7f41c7aa344337052b9d3721af` (corto: `4e01064`)
+- Hash: `1399053f80f27729b2543c62b8bc42a5f8d6c38d` (corto: `1399053`)
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `docs+build: cierra la Fase 2 — estructura núcleo del monorepo (DEC-008 a DEC-012)`
-- Contenido: 29 archivos, 2.690 inserciones/42 eliminaciones — esqueleto mínimo del monorepo
-  (`package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`/`tsconfig.json`,
-  `eslint.config.js`, `.prettierrc.json`/`.prettierignore`, `vitest.workspace.ts`,
-  `pnpm-lock.yaml`, y los tres paquetes `packages/shared`, `packages/core`,
-  `packages/secrets-broker` — todos nuevos, sin funcionalidad real); `DEVELOPMENT.md`,
+- Mensaje: `feat+docs: implementa el Tool Registry — Fase 3 (DEC-013 a DEC-017)`
+- Contenido: 19 archivos, 813 inserciones/51 eliminaciones — modelo de datos del Registry en
+  `packages/shared/src/registry/` (identity, fingerprint, tool); store + resolución de identidad
+  en `packages/core/src/registry/` (store, file-store, resolve) con 15 tests; `DEVELOPMENT.md`,
   `ROADMAP.md`, `STATE.md`, `architecture/ARCHITECTURE.md`/`.en.md`, `decisions/DECISIONS.md`
-  (actualizados); `architecture/CORE-STRUCTURE-ANALYSIS.md` (nuevo).
-- Commits anteriores: `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
+  (actualizados con DEC-013 a DEC-017).
+- Commits anteriores: `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef`
+  (Fase 0 + Fase 0.5).
 
 ## Estado del push
 
 - **Realizado** (2026-09-16, con autorización explícita del usuario). `master` sincronizado con
-  `origin/master` (`4e01064`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
+  `origin/master` (`1399053`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
   al mismo hash).
 
 ## Próxima acción recomendada
 
-1. Pedir autorización explícita para el commit+push de los cambios de la Fase 3 (DEC-013 a
-   DEC-017, implementación del Tool Registry, documentación sincronizada).
+1. Pedir autorización explícita para el commit+push de los cambios de la Fase 4 (DEC-018 a
+   DEC-022, implementación del Tool Discovery, documentación sincronizada).
 2. Tras el commit/push, presentar únicamente el resumen de objetivos y decisiones a analizar de la
-   Fase 4 (Tool Discovery) — sin implementar nada de esa fase todavía.
+   Fase 5 (Policy Engine) — sin implementar nada de esa fase todavía.
 3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
    `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`.

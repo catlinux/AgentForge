@@ -226,7 +226,17 @@ ficheros de configuración versionados en git o en almacenamiento propio (base d
 
 ## 6. Descubrimiento de tools (Tool Discovery)
 
-**PROPOSAL:**
+**DECISIÓN (DEC-018 a DEC-022, Fase 4):** estrategia de reducción, configuración declarativa,
+forma de salida, tratamiento de `stale`, y ubicación en el monorepo ya están decididos — ver
+`decisions/DECISIONS.md`. Resumen: filtro estático por configuración (sin uso/historial ni
+relevancia semántica todavía, interfaz abierta a añadirlas después); configuración propia en JSON,
+separada de la de orígenes del Registry; salida mediante proyección reducida propia
+(`DiscoveredToolView`), sin exponer `identity`/`schemaFingerprint` internos ni acoplarse al formato
+MCP; exclusión automática de entradas `stale` (DEC-016); módulo en `packages/core/src/discovery/`,
+sin paquete propio. El resto de esta sección se conserva como contexto/inspiración original de la
+Fase 1, ya superado en el detalle por las decisiones de Fase 4.
+
+**PROPOSAL (contexto histórico, Fase 1 — ver DEC-018 a DEC-022 arriba para lo ya decidido):**
 
 - Para la fase 1, con un catálogo pequeño (probablemente menos de 20 herramientas iniciales:
   ejecución SSH + algunas acciones específicas), el problema de "reducir el número de herramientas
@@ -242,8 +252,8 @@ ficheros de configuración versionados en git o en almacenamiento propio (base d
   (`docs/es/research/RELATED-PROJECTS.md`, sección "Discovery"). Se deja explícitamente como
   **trabajo futuro, no de la fase 1**.
 
-**OPEN QUESTION:** ninguna bloqueante para la fase 1 — esta sección queda deliberadamente ligera
-por decisión de alcance (PROPOSAL: no implementar descubrimiento dinámico todavía).
+~~**OPEN QUESTION:** ninguna bloqueante para la fase 1~~ — **resuelto en Fase 4, ver DEC-018 a
+DEC-022.** El patrón de meta-tools/búsqueda sigue siendo trabajo futuro fuera de esta fase.
 
 ---
 

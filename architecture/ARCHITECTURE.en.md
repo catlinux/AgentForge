@@ -224,7 +224,17 @@ Phase 3, see DEC-014.**
 
 ## 6. Tool Discovery
 
-**PROPOSAL:**
+**DECISION (DEC-018 to DEC-022, Phase 4):** reduction strategy, declarative configuration, output
+shape, `stale` handling, and monorepo location are already decided — see
+`decisions/DECISIONS.md`. Summary: static filter by configuration (no usage/history or semantic
+relevance yet, interface left open to add those later); own JSON configuration file, separate from
+the Registry's origin config; output via a dedicated reduced projection (`DiscoveredToolView`),
+never exposing internal `identity`/`schemaFingerprint` nor coupling directly to the MCP format;
+automatic exclusion of `stale` entries (DEC-016); module in `packages/core/src/discovery/`, no
+dedicated package. The rest of this section is kept as the original Phase 1 context/inspiration,
+now superseded in detail by the Phase 4 decisions.
+
+**PROPOSAL (historical context, Phase 1 — see DEC-018 to DEC-022 above for what is now decided):**
 
 - For phase 1, with a small catalog (likely fewer than 20 initial tools: SSH execution + a few
   specific actions), the problem of "reducing the number of tools exposed to the LLM's context"
@@ -238,8 +248,8 @@ Phase 3, see DEC-014.**
   ContextForge's namespaced federation (`docs/en/research/RELATED-PROJECTS.md`, "Discovery"
   section). This is explicitly left as **future work, not phase 1**.
 
-**OPEN QUESTION:** none blocking for phase 1 — this section is deliberately light by scope
-decision (PROPOSAL: don't implement dynamic discovery yet).
+~~**OPEN QUESTION:** none blocking for phase 1~~ — **resolved in Phase 4, see DEC-018 to
+DEC-022.** The meta-tools/search pattern remains future work outside this phase.
 
 ---
 

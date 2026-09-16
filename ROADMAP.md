@@ -14,7 +14,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 1 | Arquitectura y decisiones tecnológicas | **Completada** — 5 decisiones aprobadas (DEC-003 a DEC-007), base arquitectónica en `architecture/ARCHITECTURE.md` |
 | 2 | Arquitectura núcleo | **En curso** — 5 decisiones aprobadas (DEC-008 a DEC-012), esqueleto todavía no creado |
 | 3 | Tool Registry | **En curso** — 5 decisiones aprobadas (DEC-013 a DEC-017) |
-| 4 | Tool Discovery | Propuesta, no iniciada |
+| 4 | Tool Discovery | **En curso** — 5 decisiones aprobadas (DEC-018 a DEC-022) |
 | 5 | Permission / Policy Engine | Propuesta, no iniciada |
 | 6 | Secrets Broker | Propuesta, no iniciada |
 | 7 | Ejecución remota / SSH | Propuesta, no iniciada |
@@ -71,6 +71,11 @@ de ellas.
   no-herencia automática, y ubicación dentro de `packages/core` (sin paquete propio).
 - **Fase 4 — Tool Discovery**: mecanismo de descubrimiento/reducción de herramientas expuestas al
   contexto del agente (inspirado conceptualmente en el Tool Router de Composio, sin su código).
+  5 decisiones aprobadas (DEC-018 a DEC-022, ver `decisions/DECISIONS.md`): filtro estático por
+  configuración (sin uso/historial ni relevancia semántica todavía), configuración declarativa
+  propia y separada de la del Registry, salida mediante proyección propia reducida
+  (`DiscoveredToolView`, sin exponer `identity` interna), exclusión automática de entradas
+  `stale`, y ubicación dentro de `packages/core` sin paquete propio.
 - **Fase 5 — Permission / Policy Engine**: clasificación de acciones por riesgo/reversibilidad y
   aplicación de política fuera del control del modelo.
 - **Fase 6 — Secrets Broker**: gestión de credenciales (claves SSH, tokens) nunca expuestas
