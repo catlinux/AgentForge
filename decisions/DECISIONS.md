@@ -136,6 +136,96 @@ Format per a cada decisió futura:
   y detalles de empaquetado quedan pospuestos a la Fase 2, para no decidir de más en esta fase
   (`architecture/TECH-STACK-ANALYSIS.md` §5).
 
+## DEC-008 — Estructura de repositorio (Fase 2)
+
+- Fecha: 2026-09-16
+- Contexto: `architecture/CORE-STRUCTURE-ANALYSIS.md` (Decisión 1) evaluó monorepo con workspaces,
+  paquete único con carpetas internas, y multi-repo, dado que DEC-004 exige que Core y el Secrets
+  Broker sean procesos separados y el proyecto debe poder crecer con más servidores MCP/execution
+  backends sin reestructurar lo existente.
+- Opciones consideradas: (A) monorepo con workspaces; (B) paquete único con carpetas internas;
+  (C) multi-repo.
+- Decisión: **(A) monorepo con workspaces**, con paquetes iniciales `packages/shared`,
+  `packages/core`, `packages/secrets-broker`.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: cada paquete declara sus propias dependencias, reforzando a nivel de empaquetado
+  la separación Core/Secrets Broker exigida por DEC-004. Añadir un nuevo servidor MCP o execution
+  backend en el futuro es añadir un paquete (`packages/mcp-<nombre>`, `packages/execution-<nombre>`)
+  sin tocar los existentes.
+
+## DEC-009 — Gestor de paquetes (Fase 2)
+
+- Fecha: 2026-09-16
+- Contexto: `architecture/CORE-STRUCTURE-ANALYSIS.md` (Decisión 2) evaluó npm, pnpm y yarn para el
+  monorepo de DEC-008, con especial atención a si el gestor refuerza o debilita el aislamiento de
+  dependencias entre Core y el Secrets Broker.
+- Opciones consideradas: npm; pnpm; yarn (Classic o Berry/PnP).
+- Decisión: **pnpm**.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: el `node_modules` estricto de pnpm impide que un paquete resuelva dependencias no
+  declaradas explícitamente ("dependencias fantasma"), reforzando automáticamente, a nivel de
+  instalación, la frontera de confianza de DEC-004. Instalación vía Corepack, sin fricción
+  adicional.
+
+## DEC-010 — Mecanismo de IPC entre Core y Secrets Broker (Fase 2)
+
+- Fecha: 2026-09-16
+- Contexto: `architecture/CORE-STRUCTURE-ANALYSIS.md` (Decisión 3) evaluó named pipe de Windows,
+  TCP local con token, socket de dominio Unix en Windows, y pipe stdio (descartado por ser
+  incompatible en la práctica con DEC-004). Se amplió el análisis a petición del usuario para
+  cubrir explícitamente el comportamiento en Windows, Linux y el impacto de un futuro soporte de
+  macOS.
+- Opciones consideradas: (A) named pipe de Windows + ACL; (B) TCP loopback + token; (C) socket de
+  dominio Unix en Windows; (D) pipe stdio (descartado, incompatible con DEC-004).
+- Decisión: mecanismo de IPC con **implementación nativa por sistema operativo**, unificada detrás
+  de una interfaz de transporte agnóstica en `packages/shared`, seleccionada en tiempo de ejecución
+  según `process.platform`:
+  - **Windows:** named pipe (`\\.\pipe\agentforge-secrets`) con ACL restringida al SID del usuario
+    de Core y al del Secrets Broker.
+  - **Linux/macOS:** Unix domain socket con permisos de fichero/directorio restringidos al usuario
+    de Core.
+  - La interfaz de `packages/shared` se diseña con vocabulario neutro de sistema operativo (sin
+    filtrar conceptos específicos de Windows) desde el principio.
+  - **La rama Linux/macOS no se implementa todavía** — Windows es el único sistema operativo real
+    de ejecución hoy. Solo se garantiza que la interfaz no excluye añadirla más adelante sin
+    rediseño.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa, incorporando la aclaración
+  multiplataforma).
+- Consecuencias: en ambos sistemas operativos, la frontera "solo Core puede hablar con el Broker"
+  la aplica el sistema operativo (ACL o permisos de fichero) sobre el canal mismo, no un token de
+  aplicación — mantiene intacta la garantía de DEC-004 de forma equivalente en cada SO. El coste de
+  un cambio de transporte futuro queda acotado a la implementación de la interfaz en
+  `packages/shared`, no a todo el código que la usa. Pendiente, no bloqueante: si en el futuro Core
+  y el Secrets Broker corrieran en contenedores/namespaces separados en Linux en vez de como
+  usuarios Linux distintos en el mismo host, el modelo de aislamiento cambiaría — no está decidido
+  ni es relevante hoy (no hay containerización prevista en el roadmap actual).
+
+## DEC-011 — Convenciones de código (Fase 2)
+
+- Fecha: 2026-09-16
+- Contexto: `architecture/CORE-STRUCTURE-ANALYSIS.md` (Decisión 4) evaluó linter/formatter,
+  configuración de TypeScript, y framework de testing para el monorepo de DEC-008.
+- Opciones consideradas: ESLint+Prettier vs. Biome; TypeScript estricto desde el inicio vs.
+  configuración laxa progresiva; Vitest vs. Jest vs. `node:test`.
+- Decisión: **TypeScript en modo estricto desde el principio**, **ESLint + Prettier**, **Vitest**
+  como framework de testing.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: configuraciones base (`tsconfig.base.json`, configuración raíz de ESLint) viven en
+  la raíz del monorepo y cada paquete las extiende. Se considerará `eslint-plugin-security` como
+  parte del hardening de una fase posterior (Fase 13 del roadmap), no como requisito de esta fase.
+
+## DEC-012 — Creación del esqueleto de carpetas (Fase 2)
+
+- Fecha: 2026-09-16
+- Contexto: `architecture/CORE-STRUCTURE-ANALYSIS.md` (Decisión 5) planteó si crear ya el esqueleto
+  de carpetas/`package.json`/configuración base tras aprobar DEC-008 a DEC-011, o tratar esta fase
+  como puramente de decisión y crear el esqueleto en un paso posterior explícitamente autorizado.
+- Opciones consideradas: (A) crear el esqueleto ahora; (B) esperar a un paso posterior explícito.
+- Decisión: **(B) esperar**. No se crea ninguna carpeta ni fichero todavía.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: el árbol de carpetas y el contenido propuesto de cada fichero de configuración se
+  presentarán para revisión explícita antes de crear nada, como paso separado.
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -152,6 +242,11 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 - ~~Uso de GitHub~~ → DEC-001.
 - ~~Identidad Git~~ → DEC-002.
 - ~~Stack tecnológico~~ → DEC-007.
+- ~~Estructura de repositorio (Fase 2)~~ → DEC-008.
+- ~~Gestor de paquetes (Fase 2)~~ → DEC-009.
+- ~~Mecanismo de IPC Core↔Secrets Broker (Fase 2)~~ → DEC-010.
+- ~~Convenciones de código (Fase 2)~~ → DEC-011.
+- ~~Creación del esqueleto de carpetas (Fase 2)~~ → DEC-012.
 
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):
@@ -162,8 +257,13 @@ durante la Fase 2 o cuando corresponda):
    investigación de la Fase 0, o si se mantiene como está permanentemente (ver `README.md`).
 3. **Visibilidad del repositorio** `catlinux/AgentForge` (público/privado) — no confirmada
    explícitamente por el usuario, no asumida.
-4. **Traducción al inglés de `architecture/TECH-STACK-ANALYSIS.md`** — pospuesta a propósito
-   hasta que la documentación esté más estable (decisión del usuario, 2026-09-16).
-5. Preguntas de detalle de implementación de la Fase 2, listadas en `architecture/ARCHITECTURE.md`
-   §20 (framework HTTP concreto, formato del Tool Registry, mecanismo de IPC, etc.) — no repetidas
-   aquí para evitar una segunda fuente de verdad; ver ese documento.
+4. **Traducción al inglés de `architecture/TECH-STACK-ANALYSIS.md`** y
+   **`architecture/CORE-STRUCTURE-ANALYSIS.md`** — pospuesta a propósito hasta que la
+   documentación esté más estable (decisión del usuario, 2026-09-16).
+5. Preguntas de detalle de implementación de la Fase 2 todavía no cubiertas por DEC-008 a DEC-012
+   (framework HTTP concreto, formato del Tool Registry, paquete de acceso a Windows Credential
+   Manager, empaquetado exacto del Secrets Broker, etc.), listadas en
+   `architecture/ARCHITECTURE.md` §20 — no repetidas aquí para evitar una segunda fuente de verdad.
+6. Implementación de la rama Linux/macOS del transporte IPC (DEC-010) — deliberadamente no
+   implementada todavía; solo la interfaz agnóstica y la implementación Windows están previstas
+   para cuando se cree el esqueleto.

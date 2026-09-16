@@ -1,0 +1,4 @@
+# Prettier is scoped to source code (DEC-011), not to existing project documentation from
+# previous phases — reformatting already-approved docs is out of scope for this phase.
+*.md
+pnpm-lock.yaml

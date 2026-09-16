@@ -576,7 +576,9 @@ fases posteriores o al implementar)
    AgentForge? (§4)
 3. Formato de definición del Tool Registry y dónde vive (ficheros vs. almacenamiento propio) (§5)
 4. Lenguaje de reglas del Policy Engine: ¿allowlists planas o algo más expresivo? (§7)
-5. Mecanismo concreto de IPC entre AgentForge Core y el Secrets Broker (§3, §8, §18)
+5. ~~Mecanismo concreto de IPC entre AgentForge Core y el Secrets Broker (§3, §8, §18)~~ —
+   **resuelto en Fase 2, ver DEC-010** (named pipe en Windows / Unix domain socket en Linux-macOS,
+   tras interfaz agnóstica en `packages/shared`).
 6. Usuario de sistema dedicado en cada host remoto (Debian, Contabo) — no se puede resolver sin
    tocar esos sistemas, pendiente para cuando se autorice la Fase 7 (§9)
 7. Formato/almacenamiento del Audit Log (fichero JSON Lines vs. SQLite) (§12)

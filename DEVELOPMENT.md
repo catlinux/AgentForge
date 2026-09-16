@@ -22,9 +22,24 @@ AgentForge (Core, servidores MCP propios, y el Secrets Broker como proceso separ
 lenguaje — ver `decisions/DECISIONS.md` y el análisis completo en
 `architecture/TECH-STACK-ANALYSIS.md`).
 
-Detalles todavía pendientes (no bloqueantes, se resuelven en la Fase 2): framework HTTP concreto
-(Express/Fastify/otro), paquete de acceso a Windows Credential Manager, y empaquetado del Secrets
-Broker como proceso independiente.
+Detalles todavía pendientes (no bloqueantes): framework HTTP concreto (Express/Fastify/otro),
+paquete de acceso a Windows Credential Manager, y empaquetado exacto del Secrets Broker como
+proceso independiente.
+
+**DECIDIDO (DEC-008 a DEC-012, Fase 2, 2026-09-16):** estructura de repositorio, gestor de
+paquetes, mecanismo de IPC, y convenciones de código — ver `decisions/DECISIONS.md` y el análisis
+completo en `architecture/CORE-STRUCTURE-ANALYSIS.md`.
+
+- **Estructura:** monorepo con workspaces — `packages/shared`, `packages/core`,
+  `packages/secrets-broker` (DEC-008).
+- **Gestor de paquetes:** pnpm, vía Corepack (DEC-009).
+- **IPC Core↔Secrets Broker:** named pipe con ACL en Windows, Unix domain socket con permisos del
+  SO en Linux/macOS, detrás de una interfaz de transporte agnóstica en `packages/shared`,
+  seleccionada según `process.platform`. La rama Linux/macOS no está implementada todavía
+  (DEC-010).
+- **Convenciones de código:** TypeScript en modo estricto, ESLint + Prettier, Vitest (DEC-011).
+- **Esqueleto de carpetas:** todavía NO creado — pendiente de un paso posterior explícitamente
+  autorizado (DEC-012).
 
 ## Cómo ejecutar el proyecto
 

@@ -561,7 +561,9 @@ during implementation)
    (§4)
 3. Tool Registry definition format and where it lives (files vs. dedicated storage) (§5)
 4. Policy Engine rule language: flat allowlists or something more expressive? (§7)
-5. Exact IPC mechanism between AgentForge Core and the Secrets Broker (§3, §8, §18)
+5. ~~Exact IPC mechanism between AgentForge Core and the Secrets Broker (§3, §8, §18)~~ —
+   **resolved in Phase 2, see DEC-010** (Windows named pipe / Linux-macOS Unix domain socket,
+   behind an agnostic transport interface in `packages/shared`).
 6. Dedicated system user on each remote host (Debian, Contabo) — cannot be resolved without
    touching those systems, pending until Phase 7 is authorized (§9)
 7. Audit Log format/storage (JSON Lines file vs. SQLite) (§12)

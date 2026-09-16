@@ -12,7 +12,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 0 | Investigación técnica | **Completada** |
 | 0.5 | Fundamentos del proyecto y gobernanza | **En curso** |
 | 1 | Arquitectura y decisiones tecnológicas | **Completada** — 5 decisiones aprobadas (DEC-003 a DEC-007), base arquitectónica en `architecture/ARCHITECTURE.md` |
-| 2 | Arquitectura núcleo | Propuesta, no iniciada |
+| 2 | Arquitectura núcleo | **En curso** — 5 decisiones aprobadas (DEC-008 a DEC-012), esqueleto todavía no creado |
 | 3 | Tool Registry | Propuesta, no iniciada |
 | 4 | Tool Discovery | Propuesta, no iniciada |
 | 5 | Permission / Policy Engine | Propuesta, no iniciada |
@@ -56,8 +56,13 @@ Estas fases son una descomposición inicial razonable dado lo investigado en la 
 están comprometidas**. Tras la Fase 1 podría tener sentido fusionar, dividir o reordenar algunas
 de ellas.
 
-- **Fase 2 — Arquitectura núcleo**: estructura base del proyecto de software (una vez decidido el
-  stack), sin funcionalidad todavía.
+- **Fase 2 — Arquitectura núcleo**: estructura base del proyecto de software. 5 decisiones
+  aprobadas (DEC-008 a DEC-012, ver `architecture/CORE-STRUCTURE-ANALYSIS.md` y
+  `decisions/DECISIONS.md`): monorepo con workspaces (`packages/shared`, `packages/core`,
+  `packages/secrets-broker`), pnpm como gestor de paquetes, IPC Core↔Secrets Broker mediante named
+  pipe (Windows) / Unix domain socket (Linux-macOS) tras una interfaz agnóstica, TypeScript
+  estricto + ESLint + Prettier + Vitest, y esqueleto de carpetas todavía sin crear. Sin
+  funcionalidad todavía.
 - **Fase 3 — Tool Registry**: catálogo de herramientas disponibles (locales + remotas) con schema.
 - **Fase 4 — Tool Discovery**: mecanismo de descubrimiento/reducción de herramientas expuestas al
   contexto del agente (inspirado conceptualmente en el Tool Router de Composio, sin su código).

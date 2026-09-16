@@ -12,28 +12,27 @@ copiar).
 
 ## Fase actual
 
-**Fase 1 — Arquitectura y decisiones tecnológicas**
+**Fase 2 — Arquitectura núcleo**
 
-**Estado:** COMPLETADA (2026-09-16) — 5 decisiones aprobadas (DEC-003 a DEC-007); detalles menores
-de implementación (framework HTTP, paquete de Credential Manager, empaquetado del Secrets Broker)
-pospuestos deliberadamente a la Fase 2 por decisión explícita del usuario.
+**Estado:** COMPLETADA (2026-09-16) — 5 decisiones aprobadas (DEC-008 a DEC-012: estructura de
+repositorio, gestor de paquetes, IPC Core↔Secrets Broker, convenciones de código, y creación del
+esqueleto mínimo). Ver `architecture/CORE-STRUCTURE-ANALYSIS.md` para el análisis completo y
+`decisions/DECISIONS.md` para el registro formal.
 
-**Implementación:** NO INICIADA
+**Implementación:** esqueleto mínimo del monorepo creado (`packages/shared`, `packages/core`,
+`packages/secrets-broker`), sin ninguna funcionalidad real de AgentForge todavía — solo
+configuración, placeholders de entrada, y el contrato de transporte agnóstico de SO (DEC-010).
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
-**Arquitectura:** BASE ARQUITECTÓNICA APROBADA (Fase 1) — 5 decisiones aprobadas (DEC-003 a
-DEC-007), resto documentado como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20,
-explícitamente pospuesto a la Fase 2. No es una arquitectura de implementación detallada — sigue
-siendo una base, no el diseño final de cada componente.
+**Arquitectura:** BASE ARQUITECTÓNICA APROBADA (Fase 1: DEC-003 a DEC-007) + ESTRUCTURA NÚCLEO
+APROBADA (Fase 2: DEC-008 a DEC-012). Resto documentado como PROPOSAL/OPEN QUESTION en
+`architecture/ARCHITECTURE.md` §20. Sigue sin existir ningún fichero de código.
 
 ## Microtarea actual
 
-Ninguna en curso. La Fase 1 se completó (DEC-003 a DEC-007), se hizo una comprobación de
-consistencia documental final (ver más abajo, incluye una limpieza de contenido duplicado
-heredado de la Fase 0.5 en `decisions/DECISIONS.md`), y se hizo commit+push (autorizado
-explícitamente). El siguiente paso es la Fase 2, todavía sin iniciar más allá de un resumen de
-objetivos — no se ha implementado nada.
+Fase 2 cerrada (commit+push autorizados y ejecutados). Siguiente paso: presentar el resumen de
+objetivos y decisiones a analizar de la Fase 3 — sin implementar nada todavía.
 
 ## Trabajo completado
 
@@ -139,6 +138,57 @@ proyecto estudiado; toda idea de investigación (Fase 0 y 0.7) que se cita en
 `architecture/ARCHITECTURE.md` se marca explícitamente como PROPOSAL o inspiración, nunca como
 decisión automática.
 
+### Fase 2 — Arquitectura núcleo (en curso, iniciada 2026-09-16)
+- [x] `architecture/CORE-STRUCTURE-ANALYSIS.md` creado: análisis de las 5 decisiones estructurales
+      (estructura de repositorio, gestor de paquetes, IPC Core↔Secrets Broker, convenciones de
+      código, y si crear ya el esqueleto), cada una con alternativas, ventajas/desventajas,
+      dependencias entre decisiones, consecuencias de cambiarla después, y recomendación.
+- [x] Ampliación de la Decisión 3 (IPC) a petición explícita del usuario: comportamiento en
+      Windows, en Linux, diseño de una abstracción multiplataforma, impacto en la frontera de
+      DEC-004, impacto de un futuro soporte de macOS, y revisión de alternativas más simples con
+      seguridad equivalente (ninguna encontrada — TCP+token es más simple pero no equivalente en
+      seguridad).
+- [x] **DEC-008** — Estructura de repositorio: monorepo con workspaces (`packages/shared`,
+      `packages/core`, `packages/secrets-broker`).
+- [x] **DEC-009** — Gestor de paquetes: pnpm.
+- [x] **DEC-010** — IPC Core↔Secrets Broker: named pipe+ACL (Windows) / Unix domain socket
+      (Linux-macOS), interfaz agnóstica en `packages/shared`, selección por `process.platform`,
+      rama Linux/macOS no implementada todavía.
+- [x] **DEC-011** — Convenciones de código: TypeScript estricto, ESLint+Prettier, Vitest.
+- [x] **DEC-012** — Esqueleto de carpetas: todavía NO se crea; queda como paso posterior
+      explícitamente autorizado.
+- [x] `decisions/DECISIONS.md` actualizado con DEC-008 a DEC-012 y la lista de PENDIENTE revisada.
+- [x] `architecture/ARCHITECTURE.md`/`.en.md` §20 actualizado: la pregunta abierta sobre el
+      mecanismo de IPC marcada como resuelta (DEC-010).
+- [x] `ROADMAP.md` actualizado: Fase 2 marcada "En curso" con el resumen de las 5 decisiones.
+- [x] Árbol de repositorio propuesto presentado y aprobado por el usuario en principio.
+- [x] Dos observaciones del usuario resueltas antes de crear el esqueleto: (1) no crear
+      subcarpetas para componentes futuros (Tool Registry, Policy Engine, hooks/MCP, Audit Log,
+      Execution Backends) — se posponen a sus fases correspondientes, evita anticipar estructura
+      sin decisión propia; (2) formato de ESLint decidido como `eslint.config.js` (flat config,
+      estándar desde ESLint 9, compatible con Node 24 instalado) en vez de `.eslintrc.*` (legado) —
+      detalle de formato, no una nueva decisión arquitectónica, resuelto sin nuevo DEC-XXX.
+- [x] **Esqueleto mínimo creado** (sin funcionalidad, DEC-008 a DEC-012): raíz del monorepo
+      (`package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`/`tsconfig.json`,
+      `eslint.config.js`, `.prettierrc.json`/`.prettierignore`, `vitest.workspace.ts`); tres
+      paquetes (`packages/shared`, `packages/core`, `packages/secrets-broker`) con `package.json`,
+      `tsconfig.json` propios y un `src/index.ts` placeholder; `packages/shared/src/transport`
+      contiene el contrato `SecretsBrokerTransport` agnóstico de SO (DEC-010, sin implementación);
+      `packages/core/src/transport` y `packages/secrets-broker/src/transport` son placeholders
+      vacíos para las futuras implementaciones Windows/Linux-macOS. Ningún componente futuro
+      (Tool Registry, Policy Engine, Audit Log, etc.) tiene carpeta todavía.
+- [x] Verificado: `pnpm install` correcto (152 paquetes, sin errores); `pnpm run typecheck`
+      correcto en los 3 paquetes; `pnpm run lint` sin errores ni warnings; `pnpm run format`
+      (Prettier `--check`) correcto, acotado a código fuente vía `.prettierignore` (no reformatea
+      la documentación Markdown de fases anteriores); `pnpm run test` correcto (0 tests, exit 0
+      vía `--passWithNoTests`, esperado en un esqueleto sin funcionalidad). Verificado también:
+      `dist/`, `node_modules/`, `*.tsbuildinfo` correctamente ignorados por `.gitignore`
+      (no aparecen en `git status`); grep de patrones de secretos/credenciales sobre todos los
+      ficheros nuevos — ninguna coincidencia real (solo referencias legítimas al nombre
+      "secrets-broker").
+- [x] Commit y push de los cambios de esta fase — autorizados y ejecutados (ver "Último commit" /
+      "Estado del push" más abajo).
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -170,6 +220,13 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-006** — Ejecución remota: claves SSH ed25519 dedicadas por host (Debian casa, Contabo),
   sin CA SSH en la fase 1.
 - **DEC-007** — Stack tecnológico: TypeScript/Node.js como stack único para todo AgentForge.
+- **DEC-008** — Estructura de repositorio: monorepo con workspaces (`packages/shared`,
+  `packages/core`, `packages/secrets-broker`).
+- **DEC-009** — Gestor de paquetes: pnpm.
+- **DEC-010** — IPC Core↔Secrets Broker: named pipe+ACL (Windows) / Unix domain socket
+  (Linux-macOS), interfaz agnóstica en `packages/shared`, rama Linux/macOS no implementada todavía.
+- **DEC-011** — Convenciones de código: TypeScript estricto, ESLint+Prettier, Vitest.
+- **DEC-012** — Esqueleto de carpetas: todavía NO se crea, pendiente de paso posterior autorizado.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -261,28 +318,32 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `d83da17`
+- Hash: `2922629`
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `docs: añade exploración ligera de proyectos relacionados (Fase 0.7)`
-- Contenido: 5 archivos, 1.615 inserciones/23 eliminaciones — `docs/es/research/RELATED-PROJECTS.md`
-  y `docs/en/research/RELATED-PROJECTS.md` (nuevos), `README.md`/`README.en.md` (referencia
-  cruzada añadida), `STATE.md` (cierre de Fase 0.7). Ningún archivo de código.
-- Commit anterior: `c671bef` — `docs: establece la base y gobernanza inicial de AgentForge` (Fase
-  0 + Fase 0.5, 18 archivos, 2.768 inserciones).
+- Mensaje: `docs: cierra la Fase 1 — arquitectura y decisiones tecnológicas`
+- Contenido: 10 archivos, 1.629 inserciones/72 eliminaciones —
+  `architecture/ARCHITECTURE.md`/`.en.md` y `architecture/TECH-STACK-ANALYSIS.md` (nuevos);
+  `DEVELOPMENT.md`, `README.md`/`.en.md`, `ROADMAP.md`, `STATE.md`,
+  `architecture/ARCHITECTURE-DRAFT.md`, `decisions/DECISIONS.md` (actualizados, incluye limpieza
+  de contenido duplicado heredado de la Fase 0.5). Ningún archivo de código.
+- Commits anteriores: `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
 
 ## Estado del push
 
-- **Realizado** (2026-09-16, con autorización explícita del usuario, para ambos commits). `master`
-  sincronizado con `origin/master` (`d83da17`), working tree limpio.
+- **Realizado** (2026-09-16, con autorización explícita del usuario, para los tres commits).
+  `master` sincronizado con `origin/master` (`2922629`), working tree limpio.
 
 ## Próxima acción recomendada
 
-1. Confirmar visibilidad del repositorio `catlinux/AgentForge` (pública/privada) si es relevante.
-2. Resolver las decisiones pendientes restantes (relación con Claude Code, modelo de amenaza del
-   Secrets Broker, estrategia MCP, arquitectura de ejecución remota, licencia del proyecto,
-   inconsistencia de idioma Fase 0) antes o durante la Fase 1.
-3. **Siguiente fase propuesta: Fase 1 — Arquitectura y decisiones tecnológicas.** No se inicia
-   sin autorización explícita del usuario.
+1. Presentar el árbol de repositorio propuesto (paquetes y responsabilidades) para revisión del
+   usuario — sin crear todavía ningún fichero ni carpeta (DEC-012).
+2. Una vez revisado, pedir autorización explícita para el commit+push de los cambios de la Fase 2
+   (análisis + DEC-008 a DEC-012 + documentación sincronizada).
+3. Tras el commit/push, pedir autorización explícita separada antes de crear el esqueleto de
+   carpetas/`package.json`/configuración base.
+4. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
+   del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
+   `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`.
 
 ## Cómo reprender este trabajo
 
