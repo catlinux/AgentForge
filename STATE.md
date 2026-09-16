@@ -1,0 +1,191 @@
+# STATE.md — AgentForge
+
+**Última actualización:** 2026-09-16 (fin de la Fase 0.5)
+
+## Proyecto
+
+AgentForge: infraestructura modular propia para que agentes de IA (inicialmente Claude Code)
+puedan usar herramientas, MCP, conectores, sistemas remotos, APIs, autenticación, permisos,
+descubrimiento de herramientas, sesiones y automatizaciones de forma controlada, extensible y sin
+dependencia obligatoria de un proveedor externo. Toma Composio como referencia (no como modelo a
+copiar).
+
+## Fase actual
+
+**Fase 0.5 — Fundamentos del proyecto y gobernanza**
+
+**Estado:** COMPLETADA
+
+**Implementación de software:** NO INICIADA
+
+**Investigación:** COMPLETADA (Fase 0)
+
+**Arquitectura:** BORRADOR / PENDIENTE DE APROBACIÓN
+
+## Microtarea actual
+
+Ninguna en curso — la Fase 0.5 se ha completado y el trabajo se detiene aquí a la espera de
+instrucciones del usuario, tal como especifica el encargo de esta fase.
+
+## Trabajo completado
+
+### Fase 0 — Technical Research & Bootstrap (completada, 2026-09-16)
+- Investigación de Composio, MCP, Claude Code/VS Code/Agent SDK, y SSH/seguridad para agentes.
+- Documentos: `docs/research/RESEARCH-REPORT.md`, `COMPOSIO-ANALYSIS.md`, `MCP-ANALYSIS.md`,
+  `CLAUDE-CODE-ANALYSIS.md`, `SOURCES.md`; `research/SSH-SECURITY-NOTES.md`;
+  `architecture/ARCHITECTURE-DRAFT.md` (propuesta, no aprobada); `decisions/DECISIONS.md` (creado).
+- **Nota de idioma:** todos estos documentos de la Fase 0 están en **catalán**, idioma en el que se
+  encargó originalmente esa fase.
+
+### Fase 0.5 — Fundamentos del proyecto y gobernanza (completada, 2026-09-16)
+- [x] Inspección del estado existente (Fase 0) antes de modificar nada.
+- [x] `README.md` (español, principal) y `README.en.md` (inglés) — creados.
+- [x] `CHANGELOG.md` — creado, con entradas reales de la Fase 0 y Fase 0.5 bajo `Unreleased`.
+- [x] `ROADMAP.md` — creado, con las 16 fases propuestas (0–16) claramente marcadas como
+      propuesta de planificación, no autorización.
+- [x] `CONTRIBUTING.md` — creado.
+- [x] `DEVELOPMENT.md` — creado, con stack tecnológico y licencia marcados `PENDIENTE DE DECISIÓN`.
+- [x] `SECURITY.md` — creado, principios conceptuales de seguridad derivados de la Fase 0.
+- [x] `.claude/CLAUDE.md` — creado, manual operativo conciso para Claude Code.
+- [x] `.gitignore` — creado, cubre secretos/credenciales/claves SSH y stacks candidatos
+      (Node/TypeScript, Python).
+- [x] `decisions/DECISIONS.md` — actualizado con una lista explícita de "PENDIENTE — decisiones
+      abiertas" (8 puntos), sin convertir ninguna propuesta en decisión.
+- [x] `CODE_OF_CONDUCT.md` — **NO creado deliberadamente**: para un proyecto personal, todavía
+      privado, sin colaboradores externos ni repositorio público, se ha considerado prematuro.
+      Puede crearse más adelante si el proyecto se abre a contribuciones externas.
+- [x] `LICENSE` — **NO creado deliberadamente**: no se ha inventado ninguna licencia; queda
+      documentado como PENDIENTE DE DECISIÓN en `DEVELOPMENT.md`, `README.md` y
+      `decisions/DECISIONS.md`.
+
+## Documentación sincronizada
+
+- `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
+  juntos (no traducción posterior).
+- No se ha reorganizado `docs/research/` en una estructura `docs/es/`/`docs/en/` — esos documentos
+  están en catalán (Fase 0) y moverlos sin traducirlos generaría una estructura de idioma
+  engañosa. Se ha documentado esta decisión de no-reorganización en `README.md` en vez de
+  ejecutarla silenciosamente.
+
+## Contradicciones detectadas (documentadas, no resueltas unilateralmente)
+
+1. **Idioma:** Fase 0 en catalán vs. convención de Fase 0.5 en adelante (español/inglés). Ver
+   `README.md` y punto 8 de `decisions/DECISIONS.md`. Marcado **PENDIENTE**.
+
+No se han detectado contradicciones de contenido técnico entre los documentos de la Fase 0.
+
+## Decisiones aprobadas
+
+- **DEC-001** — Usar GitHub. Repositorio ya creado por el usuario:
+  `https://github.com/catlinux/AgentForge`. Visibilidad (público/privado) no confirmada
+  explícitamente — no asumida.
+- **DEC-002** — Identidad Git local (no global) para este repositorio: nombre `catlinux`, email
+  `marc.catlinux@gmail.com`. Credenciales de acceso ya guardadas en el equipo según el usuario.
+
+Ver `decisions/DECISIONS.md` para el detalle completo.
+
+## Propuestas (no decisiones)
+
+Toda la arquitectura de `architecture/ARCHITECTURE-DRAFT.md` sigue siendo propuesta. Ver ese
+documento, sección 9, para las 4 preguntas arquitectónicas abiertas.
+
+## Decisiones pendientes
+
+Lista completa y actualizada en `decisions/DECISIONS.md` (sección "PENDIENTE"). Resumen:
+1. Relación con Claude Code (wrap CLI / Agent SDK / extensión in-place).
+2. Modelo de amenaza del Secrets Broker.
+3. Estrategia MCP (Modern-only vs. Dual-era).
+4. Arquitectura de ejecución remota (claves por host vs. CA SSH).
+5. Licencia del proyecto.
+6. ~~Uso de GitHub~~ — **resuelto, ver DEC-001**.
+7. ~~Identidad Git~~ — **resuelto, ver DEC-002**.
+8. Qué hacer con la inconsistencia de idioma Fase 0 (catalán) vs. resto del proyecto
+   (español/inglés).
+9. Visibilidad del repositorio `catlinux/AgentForge` (público/privado) — no confirmada
+   explícitamente por el usuario, no asumida.
+
+## Bloqueadores
+
+Ninguno técnico. El único bloqueador real es la falta de decisiones del usuario sobre los puntos
+anteriores — necesarias antes de iniciar la Fase 1.
+
+## Riesgos
+
+- `LEGAL REVIEW REQUIRED` (heredado de la Fase 0): inconsistencia de licencia MIT/ISC en Composio
+  — riesgo bajo, ya documentado, no bloqueante para AgentForge (no se reutiliza código de
+  Composio).
+- CVEs de seguridad de MCP citados en fuentes secundarias durante la Fase 0 — no verificados
+  contra NVD/MITRE, no deben citarse como confirmados.
+- Ninguna decisión de esta fase abre nuevos riesgos técnicos, al no haberse implementado software.
+
+## Verificaciones realizadas en esta fase
+
+- Se releyeron `STATE.md`, `decisions/DECISIONS.md` y la lista de archivos existentes antes de
+  crear ningún documento nuevo (comando `find` + lectura de cabecera de `DECISIONS.md`).
+- Se confirmó de nuevo que el directorio no es un repositorio Git (`git status` →
+  "not a git repository").
+- No se ha verificado ni tocado ningún sistema remoto (Debian casa, Contabo, GitHub, Dropbox).
+
+## Archivos modificados/creados en esta fase (Fase 0.5)
+
+```
+README.md                  (nuevo)
+README.en.md                (nuevo)
+CHANGELOG.md                (nuevo)
+ROADMAP.md                  (nuevo)
+CONTRIBUTING.md              (nuevo)
+DEVELOPMENT.md               (nuevo)
+SECURITY.md                  (nuevo)
+.gitignore                   (nuevo)
+.claude/CLAUDE.md            (nuevo)
+decisions/DECISIONS.md       (actualizado — añadida sección PENDIENTE)
+STATE.md                     (actualizado — este archivo)
+```
+
+Ningún archivo de la Fase 0 (`docs/research/*`, `research/*`, `architecture/*`) ha sido modificado
+ni eliminado en esta fase.
+
+## Estado Git
+
+- Repositorio: **no inicializado**.
+- Identidad global de la máquina: `warcrafted-server <warcrafted.server@gmail.com>` — no tocada,
+  probablemente no corresponde a este proyecto (pendiente de decisión, ver arriba).
+- Ningún commit realizado.
+
+## Estado GitHub
+
+- Repositorio remoto ya creado por el usuario: `https://github.com/catlinux/AgentForge` (DEC-001).
+- Todavía no configurado como `origin` en local (no hay repositorio Git local todavía).
+- Visibilidad (público/privado) no confirmada explícitamente.
+- Sin ningún push realizado.
+
+## Último commit
+
+Ninguno — no hay repositorio Git inicializado todavía.
+
+## Estado del push
+
+No aplica — no hay commit ni repositorio Git local todavía.
+
+## Próxima acción recomendada
+
+1. Pedir autorización explícita para `git init` + configurar identidad local (DEC-002) + añadir
+   remoto `origin` → `https://github.com/catlinux/AgentForge`.
+2. Mostrar el `git status`/`git diff` completo y el mensaje de commit propuesto, y pedir
+   autorización explícita **antes** de ejecutar el commit.
+3. Pedir autorización **por separado** para el push.
+4. Resolver las decisiones pendientes restantes (1–5, 8, 9 de la lista de arriba) antes o durante
+   la Fase 1.
+5. **Siguiente fase propuesta: Fase 1 — Arquitectura y decisiones tecnológicas.** No se inicia
+   sin autorización explícita del usuario.
+
+## Cómo reprender este trabajo
+
+1. Lee este archivo (`STATE.md`) primero.
+2. Lee `decisions/DECISIONS.md` — si contiene algún `DEC-XXX`, esa decisión ya está aprobada y
+   debe respetarse.
+3. Lee `README.md` para la visión general actual del proyecto.
+4. Para el detalle técnico completo de la investigación, ver `docs/research/RESEARCH-REPORT.md` y
+   `architecture/ARCHITECTURE-DRAFT.md` (en catalán).
+5. No asumas que ha habido commits, push, o configuración de GitHub entre sesiones salvo que este
+   archivo lo indique explícitamente.

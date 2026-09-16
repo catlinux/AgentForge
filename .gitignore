@@ -1,0 +1,73 @@
+# AgentForge — .gitignore
+# Preparado para las tecnologías previstas (Node/TypeScript y/o Python) y para evitar
+# secretos/credenciales. Se ajustará cuando la Fase 1 decida el stack tecnológico definitivo.
+
+# --- Secretos y credenciales (nunca deben entrar al repo) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.ppk
+*credentials*.json
+*secrets*.json
+.secrets/
+secrets.yaml
+secrets.yml
+sops-age-key.txt
+
+# --- Node.js / TypeScript (candidato de stack, pendiente de decisión) ---
+node_modules/
+dist/
+build/
+.turbo/
+.next/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Python (candidato de stack, pendiente de decisión) ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Entornos virtuales / gestores de versión genéricos ---
+.direnv/
+
+# --- Logs y archivos temporales ---
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# --- Cachés diversas ---
+.cache/
+.eslintcache
+
+# --- Sistema operativo / editor ---
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# --- Datos de auditoría / ejecución locales (futuros, cuando exista implementación) ---
+*.sqlite
+*.sqlite3
+/data/
+/audit-log/
+
+# --- Estado interno de sesión de Claude Code (no es documentación del proyecto) ---
+.claude/scheduled_tasks.lock
