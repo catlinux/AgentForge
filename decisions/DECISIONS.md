@@ -226,6 +226,129 @@ Format per a cada decisió futura:
 - Consecuencias: el árbol de carpetas y el contenido propuesto de cada fichero de configuración se
   presentarán para revisión explícita antes de crear nada, como paso separado.
 
+## DEC-013 — Modelo de datos del Tool Registry (Fase 3)
+
+- Fecha: 2026-09-16
+- Contexto: la Fase 3 necesitaba decidir si el modelo interno de datos de una "tool" debía ser
+  MCP-native (adoptar literalmente el formato `tools/list` de MCP), MCP-independiente (sin relación
+  con MCP), o MCP-compatible (modelo propio con adaptador en el borde). El usuario pidió
+  explícitamente no asumir que reutilizar MCP fuera automáticamente la mejor opción.
+- Opciones consideradas: (A) schema propio de AgentForge; (B) formato `tools/list` de MCP
+  extendido; (C) modelo propio con adaptador MCP explícito en el borde.
+- Decisión: **(C) MCP-compatible**. Modelo propio de AgentForge en `packages/shared`, inspirado en
+  convenciones de MCP donde aporta valor (JSON Schema para `inputSchema`, que es un estándar en sí
+  mismo, no propietario de MCP), con un adaptador explícito MCP↔modelo propio en el borde de
+  integración (Fase 8). AgentForge no adopta el formato de MCP como su modelo de dominio.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa, tras análisis con implicaciones de
+  seguridad, interoperabilidad con DEC-005, y coste de cambio).
+- Consecuencias: una tool declarada por un hook propio de AgentForge (DEC-003) o un futuro
+  execution backend no necesita simular ser MCP para encajar en el Registry. El Policy Engine
+  (Fase 5) puede añadir campos propios (nivel de riesgo, origen) sin ensuciar el formato MCP. Un
+  futuro cambio de especificación MCP se absorbe en el adaptador, sin tocar el modelo de dominio ni
+  sus consumidores (Policy Engine, Audit Log, UI).
+
+## DEC-014 — Almacenamiento del Tool Registry (Fase 3)
+
+- Fecha: 2026-09-16
+- Contexto: había que separar explícitamente cuatro conceptos que se confunden fácilmente: fuente
+  de verdad, caché/estado derivado, configuración declarativa, y descubrimiento dinámico — para
+  evitar que el Registry tratara una caché de un servidor MCP como si fuera autoritativa.
+- Opciones consideradas: (A) ficheros declarativos versionables; (B) base de datos ligera embebida
+  (SQLite); (C) solo en memoria, reconstruido en cada arranque.
+- Decisión: **(A) ficheros declarativos versionables** para la configuración (qué orígenes
+  conectar, metadatos propios de AgentForge) — fuente de verdad de lo que AgentForge decide
+  registrar. **Caché ligera en fichero (JSON), no SQLite**, para el resultado del descubrimiento
+  dinámico, explícitamente no tratada como fuente de verdad. Sin base de datos en esta fase.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: para tools de un servidor MCP externo, la fuente de verdad real es siempre el
+  propio servidor — el Registry nunca sustituye esa autoridad, solo cachea su última respuesta
+  conocida con invalidación explícita. Configuración versionable en git, auditable por diff,
+  coherente con el resto del proyecto. Migrar a SQLite más adelante (si el catálogo crece mucho o
+  se necesita multiusuario) queda acotado si el acceso al Registry pasa siempre por una interfaz
+  (`ToolRegistryStore` o equivalente), no por lectura directa de ficheros desde cualquier parte del
+  código.
+
+## DEC-015 — Alcance estático/dinámico del Tool Registry (Fase 3)
+
+- Fecha: 2026-09-16
+- Contexto: había que decidir si el catálogo es fijo, puramente descubierto en tiempo de ejecución,
+  o una combinación — y, crucialmente, trazar la frontera entre el Tool Registry (Fase 3) y el
+  futuro Tool Discovery (Fase 4) para que no se solapen responsabilidades.
+- Opciones consideradas: (A) catálogo fijo declarado de antemano; (B) descubrimiento dinámico puro;
+  (C) combinación — base declarativa de orígenes + descubrimiento dinámico del contenido real.
+- Decisión: **(C) combinación**. Qué servidores/orígenes conectar y sus metadatos de AgentForge es
+  configuración declarativa (DEC-014); qué tools expone cada origen ahora mismo se obtiene por
+  descubrimiento dinámico contra ese origen. Frontera explícita: **Registry cataloga** (qué existe
+  y su forma) — **Discovery filtra** (qué subconjunto se expone al agente y cuándo, Fase 4) —
+  **Policy Engine autoriza** (qué está permitido ejecutar, Fase 5). El Registry no decide qué
+  mostrarle al agente en un momento dado, ni autoriza ejecución.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: el Tool Discovery (Fase 4) se diseñará para leer del Registry, no para
+  reimplementar el descubrimiento MCP. El Policy Engine (Fase 5) consumirá el catálogo del
+  Registry con su clasificación, no descubrirá tools por sí mismo. El Registry cataloga tools
+  nuevas descubiertas dinámicamente sin autorizarlas automáticamente para ejecución.
+
+## DEC-016 — Identidad y versionado de una tool (Fase 3)
+
+- Fecha: 2026-09-16
+- Contexto: era necesario distinguir tres conceptos (identidad interna estable, nombre legible, y
+  versión del contrato) y definir reglas de resolución concretas, para evitar que una tool nueva
+  pudiera heredar accidentalmente la identidad o la autorización de una tool previamente conocida
+  — en particular frente a un servidor MCP comprometido intentando suplantar una tool aprobada.
+- Opciones consideradas: identificador plano por nombre; identificador namespaced por origen sin
+  identidad interna separada; identidad interna estable desacoplada del nombre + namespacing +
+  fingerprint de schema versionado, con reglas explícitas de no-herencia automática.
+- Decisión: se adoptan tres conceptos distintos:
+  - **`identity`** — identificador interno, opaco y estable, generado y controlado exclusivamente
+    por AgentForge (nunca por el servidor de origen). Es la clave primaria del Registry.
+  - **`qualified name`** — `origen:nombre`, legible, atributo mutable de una `identity`, no clave
+    primaria.
+  - **`schema fingerprint`** — hash determinista del contrato observado (`inputSchema` y otros
+    campos de contrato relevantes), versionado con historial mínimo del fingerprint anterior.
+
+  Reglas de resolución:
+  - La coincidencia de `identity` se resuelve por **(origen configurado + nombre reportado)** en
+    el momento del descubrimiento — nunca por coincidencia de nombre entre orígenes distintos, ni
+    de forma retroactiva/heurística.
+  - Un nombre no visto antes en un origen ya conocido, o un cambio de servidor físico detrás de un
+    mismo origen configurado, generan por defecto una `identity` candidata **nueva** — nunca
+    heredan automáticamente una `identity` ni una autorización existente.
+  - Fusionar dos `identity` (reconocer un renombrado real) requiere una **acción declarativa
+    explícita del usuario**, nunca una decisión automática del Registry.
+  - Un cambio de `schema fingerprint` sobre una `identity` existente se **expone como evento
+    observable**, nunca se absorbe silenciosamente — el Policy Engine (Fase 5) decide si requiere
+    re-aprobación.
+  - El Registry **nunca autoriza** — solo cataloga y expone estos hechos; la autorización es
+    responsabilidad exclusiva del Policy Engine, lo que acota el daño máximo de cualquier error de
+    resolución de identidad a una clasificación incorrecta, nunca a una ejecución no autorizada.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa, tras análisis explícito de 9 escenarios:
+  tool propia de AgentForge, tool MCP nueva, reinicio de servidor, renombrado, cambio de schema,
+  desaparición/reaparición temporal, sustitución de servidor, colisión de nombre entre servidores,
+  y servidor comprometido suplantando una tool aprobada).
+- Consecuencias: el Audit Log (Fase 10) y el Policy Engine (Fase 5) pueden referenciar una tool de
+  forma fiable a través de renombrados legítimos sin perder trazabilidad. Namespacing por origen
+  evita colisiones entre `packages/mcp-<nombre>` distintos (DEC-008). La no-herencia automática por
+  defecto es la mitigación concreta contra confusión de tool / suplantación por servidor
+  comprometido.
+
+## DEC-017 — Ubicación del Tool Registry en el monorepo (Fase 3)
+
+- Fecha: 2026-09-16
+- Contexto: había que decidir si el Tool Registry justifica un paquete propio (`packages/registry`)
+  o si debe vivir dentro de `packages/core`, comparando con la razón de ser real de la separación
+  ya aprobada en DEC-008 (frontera de seguridad de DEC-004 entre Core y Secrets Broker).
+- Opciones consideradas: (A) paquete propio `packages/registry` desde ahora; (B) módulo dentro de
+  `packages/core`, con el modelo de datos compartido en `packages/shared`.
+- Decisión: **(B)**. El Registry vive en `packages/core/src/registry/`; el modelo de datos
+  compartido (`identity`, `qualified name`, `schema fingerprint`, tipos de tool) vive en
+  `packages/shared`. No se crea `packages/registry`.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: no existe hoy ninguna razón de aislamiento de proceso/seguridad equivalente a la
+  de DEC-004/DEC-008 que justifique un paquete separado — crearlo ahora sería sobrearquitectura
+  organizativa sin beneficio real. Extraerlo más adelante (si alguna razón concreta apareciera,
+  p. ej. Fase 9 — Sessions, o multiusuario futuro) queda barato porque el modelo de datos ya vive
+  en `packages/shared` y el módulo tiene límites internos claros desde el principio.
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -247,6 +370,11 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 - ~~Mecanismo de IPC Core↔Secrets Broker (Fase 2)~~ → DEC-010.
 - ~~Convenciones de código (Fase 2)~~ → DEC-011.
 - ~~Creación del esqueleto de carpetas (Fase 2)~~ → DEC-012.
+- ~~Modelo de datos del Tool Registry (Fase 3)~~ → DEC-013.
+- ~~Almacenamiento del Tool Registry (Fase 3)~~ → DEC-014.
+- ~~Alcance estático/dinámico del Tool Registry (Fase 3)~~ → DEC-015.
+- ~~Identidad y versionado de una tool (Fase 3)~~ → DEC-016.
+- ~~Ubicación del Tool Registry en el monorepo (Fase 3)~~ → DEC-017.
 
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):

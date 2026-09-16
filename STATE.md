@@ -12,27 +12,33 @@ copiar).
 
 ## Fase actual
 
-**Fase 2 — Arquitectura núcleo**
+**Fase 3 — Tool Registry**
 
-**Estado:** COMPLETADA (2026-09-16) — 5 decisiones aprobadas (DEC-008 a DEC-012: estructura de
-repositorio, gestor de paquetes, IPC Core↔Secrets Broker, convenciones de código, y creación del
-esqueleto mínimo). Ver `architecture/CORE-STRUCTURE-ANALYSIS.md` para el análisis completo y
-`decisions/DECISIONS.md` para el registro formal.
+**Estado:** COMPLETADA (2026-09-16) — 5 decisiones aprobadas (DEC-013 a DEC-017: modelo de datos
+MCP-compatible, almacenamiento en config declarativa + caché no autoritativa, alcance
+estático+dinámico con frontera Registry/Discovery/Policy Engine, identidad
+`identity`/`qualified name`/`schema fingerprint` con reglas de no-herencia, y ubicación dentro de
+`packages/core`). Implementación completa con tests cubriendo los 9 escenarios de identidad
+analizados. Ver `decisions/DECISIONS.md` para el registro formal.
 
-**Implementación:** esqueleto mínimo del monorepo creado (`packages/shared`, `packages/core`,
-`packages/secrets-broker`), sin ninguna funcionalidad real de AgentForge todavía — solo
-configuración, placeholders de entrada, y el contrato de transporte agnóstico de SO (DEC-010).
+**Implementación:** Tool Registry funcional (sin conexión real a servidores MCP todavía — eso es
+Fase 8): modelo de datos en `packages/shared/src/registry/` (`identity`, `qualified name`,
+`schema fingerprint`, `ToolEntry`, `ToolContract`, `ToolOrigin`); `ToolRegistryStore` (interfaz) y
+`FileToolRegistryStore` (implementación en fichero JSON) + `resolveDiscoveredTool` (lógica de
+resolución de identidad DEC-016) en `packages/core/src/registry/`. Fase 2 (monorepo, DEC-008 a
+DEC-012) sigue vigente y sin cambios estructurales.
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
 **Arquitectura:** BASE ARQUITECTÓNICA APROBADA (Fase 1: DEC-003 a DEC-007) + ESTRUCTURA NÚCLEO
-APROBADA (Fase 2: DEC-008 a DEC-012). Resto documentado como PROPOSAL/OPEN QUESTION en
-`architecture/ARCHITECTURE.md` §20. Sigue sin existir ningún fichero de código.
+APROBADA (Fase 2: DEC-008 a DEC-012) + TOOL REGISTRY APROBADO E IMPLEMENTADO (Fase 3: DEC-013 a
+DEC-017). Resto documentado como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 2 cerrada (commit+push autorizados y ejecutados). Siguiente paso: presentar el resumen de
-objetivos y decisiones a analizar de la Fase 3 — sin implementar nada todavía.
+Fase 3 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
+tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 4 (Tool
+Discovery) — sin implementar nada todavía.
 
 ## Trabajo completado
 
@@ -189,6 +195,53 @@ decisión automática.
 - [x] Commit y push de los cambios de esta fase — autorizados y ejecutados (ver "Último commit" /
       "Estado del push" más abajo).
 
+### Fase 3 — Tool Registry (completada, 2026-09-16)
+- [x] Análisis completo de las 5 decisiones (marco previo MCP-native/compatible/independiente +
+      modelo de datos, almacenamiento con los 4 conceptos separados —fuente de verdad, caché,
+      configuración declarativa, descubrimiento dinámico—, alcance con frontera Registry/
+      Discovery/Policy Engine, identidad/versionado, ubicación en el monorepo).
+- [x] Profundización adicional a petición del usuario: 9 escenarios de identidad analizados
+      (tool propia de AgentForge, tool MCP nueva, reinicio de servidor, renombrado, cambio de
+      schema, desaparición/reaparición, sustitución de servidor, colisión de nombre entre
+      servidores, servidor comprometido suplantando una tool aprobada) — resultó en precisar
+      DEC-016 con reglas explícitas de resolución por (origen+nombre) y no-herencia automática.
+- [x] **DEC-013** — Modelo de datos: propio de AgentForge, MCP-compatible, adaptador en el borde.
+- [x] **DEC-014** — Almacenamiento: configuración declarativa versionable + caché no autoritativa,
+      sin SQLite.
+- [x] **DEC-015** — Alcance: estático+dinámico, frontera Registry/Discovery/Policy Engine.
+- [x] **DEC-016** — Identidad: `identity`/`qualified name`/`schema fingerprint`, reglas de
+      resolución por (origen+nombre), no-herencia automática, fusión solo por acción humana
+      explícita.
+- [x] **DEC-017** — Ubicación: `packages/core/src/registry/`, modelo en `packages/shared`, sin
+      `packages/registry` propio.
+- [x] `decisions/DECISIONS.md`, `STATE.md`, `ROADMAP.md`, `DEVELOPMENT.md`,
+      `architecture/ARCHITECTURE.md`/`.en.md` (§5 y §20) sincronizados con DEC-013 a DEC-017.
+- [x] Dos detalles de implementación resueltos con el usuario antes de escribir código (no dados
+      por decididos silenciosamente): generación de `identity` como UUID v4 aleatorio
+      (`crypto.randomUUID()`); formato de fichero de configuración/caché como JSON (no YAML).
+- [x] Implementación: `packages/shared/src/registry/` — `identity.ts` (tipos `ToolIdentity`,
+      `QualifiedName`, `SchemaFingerprint`), `fingerprint.ts` (`computeSchemaFingerprint`,
+      normalización determinista de JSON Schema), `tool.ts` (`ToolContract`, `ToolOrigin`,
+      `ToolEntry`). `packages/core/src/registry/` — `store.ts` (interfaz `ToolRegistryStore`),
+      `file-store.ts` (`FileToolRegistryStore`, caché JSON en disco), `resolve.ts`
+      (`resolveDiscoveredTool`, aplica las reglas de DEC-016).
+- [x] Tests (Vitest): 15 tests — 3 de `computeSchemaFingerprint` (determinismo); 8 de
+      `resolveDiscoveredTool` cubriendo explícitamente los casos 2, 3, 4, 5, 7, 8, 9 del análisis
+      de identidad, incluyendo un test específico de que un origen no puede suplantar la
+      `identity` de otro origen (caso 9) y que `identity` nunca es derivable del nombre/origen; 4
+      de `FileToolRegistryStore` (persistencia, caso 6 — stale sin borrado).
+- [x] Alcance respetado: no se ha implementado Tool Discovery (Fase 4), Policy Engine (Fase 5),
+      Secrets Broker funcional (Fase 6) ni ejecución real (Fase 7). No hay conexión real a
+      servidores MCP todavía (Fase 8) — el adaptador MCP↔modelo propio de DEC-013 no se ha
+      implementado, solo el modelo de datos que lo hará posible.
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 3 paquetes; `pnpm run lint` sin
+      errores; `pnpm run format` correcto (Prettier `--check`, tras `--write` sobre 3 ficheros
+      nuevos); `pnpm run test` — 15/15 tests correctos; `pnpm run build` correcto en los 3
+      paquetes; `pnpm install --frozen-lockfile` correcto (ninguna dependencia nueva añadida —
+      solo módulos nativos de Node `node:crypto`/`node:fs`/`node:path`); grep de patrones de
+      secretos/credenciales sobre todo el código nuevo — sin coincidencias; `dist/`,
+      `node_modules/`, `*.tsbuildinfo` correctamente ignorados, no aparecen en `git status`.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -227,6 +280,12 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
   (Linux-macOS), interfaz agnóstica en `packages/shared`, rama Linux/macOS no implementada todavía.
 - **DEC-011** — Convenciones de código: TypeScript estricto, ESLint+Prettier, Vitest.
 - **DEC-012** — Esqueleto de carpetas: todavía NO se crea, pendiente de paso posterior autorizado.
+- **DEC-013** — Modelo de datos del Tool Registry: propio de AgentForge, MCP-compatible.
+- **DEC-014** — Almacenamiento: configuración declarativa versionable + caché no autoritativa.
+- **DEC-015** — Alcance: estático+dinámico, frontera Registry/Discovery/Policy Engine.
+- **DEC-016** — Identidad: `identity`/`qualified name`/`schema fingerprint`, no-herencia
+  automática.
+- **DEC-017** — Ubicación: `packages/core/src/registry/`, sin paquete propio.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -318,30 +377,31 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `2922629`
+- Hash: `4e01064d50462f7f41c7aa344337052b9d3721af` (corto: `4e01064`)
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `docs: cierra la Fase 1 — arquitectura y decisiones tecnológicas`
-- Contenido: 10 archivos, 1.629 inserciones/72 eliminaciones —
-  `architecture/ARCHITECTURE.md`/`.en.md` y `architecture/TECH-STACK-ANALYSIS.md` (nuevos);
-  `DEVELOPMENT.md`, `README.md`/`.en.md`, `ROADMAP.md`, `STATE.md`,
-  `architecture/ARCHITECTURE-DRAFT.md`, `decisions/DECISIONS.md` (actualizados, incluye limpieza
-  de contenido duplicado heredado de la Fase 0.5). Ningún archivo de código.
-- Commits anteriores: `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
+- Mensaje: `docs+build: cierra la Fase 2 — estructura núcleo del monorepo (DEC-008 a DEC-012)`
+- Contenido: 29 archivos, 2.690 inserciones/42 eliminaciones — esqueleto mínimo del monorepo
+  (`package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`/`tsconfig.json`,
+  `eslint.config.js`, `.prettierrc.json`/`.prettierignore`, `vitest.workspace.ts`,
+  `pnpm-lock.yaml`, y los tres paquetes `packages/shared`, `packages/core`,
+  `packages/secrets-broker` — todos nuevos, sin funcionalidad real); `DEVELOPMENT.md`,
+  `ROADMAP.md`, `STATE.md`, `architecture/ARCHITECTURE.md`/`.en.md`, `decisions/DECISIONS.md`
+  (actualizados); `architecture/CORE-STRUCTURE-ANALYSIS.md` (nuevo).
+- Commits anteriores: `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
 
 ## Estado del push
 
-- **Realizado** (2026-09-16, con autorización explícita del usuario, para los tres commits).
-  `master` sincronizado con `origin/master` (`2922629`), working tree limpio.
+- **Realizado** (2026-09-16, con autorización explícita del usuario). `master` sincronizado con
+  `origin/master` (`4e01064`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
+  al mismo hash).
 
 ## Próxima acción recomendada
 
-1. Presentar el árbol de repositorio propuesto (paquetes y responsabilidades) para revisión del
-   usuario — sin crear todavía ningún fichero ni carpeta (DEC-012).
-2. Una vez revisado, pedir autorización explícita para el commit+push de los cambios de la Fase 2
-   (análisis + DEC-008 a DEC-012 + documentación sincronizada).
-3. Tras el commit/push, pedir autorización explícita separada antes de crear el esqueleto de
-   carpetas/`package.json`/configuración base.
-4. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
+1. Pedir autorización explícita para el commit+push de los cambios de la Fase 3 (DEC-013 a
+   DEC-017, implementación del Tool Registry, documentación sincronizada).
+2. Tras el commit/push, presentar únicamente el resumen de objetivos y decisiones a analizar de la
+   Fase 4 (Tool Discovery) — sin implementar nada de esa fase todavía.
+3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
    `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`.
 

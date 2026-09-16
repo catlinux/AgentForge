@@ -190,7 +190,18 @@ un simple allow/deny (p. ej. mostrar el diff exacto de lo que se va a ejecutar r
 
 ## 5. Modelo de Tool Registry
 
-**PROPOSAL:**
+**DECISIÓN (DEC-013 a DEC-017, Fase 3):** modelo de datos, almacenamiento, alcance,
+identidad/versionado y ubicación en el monorepo del Tool Registry ya están decididos — ver
+`decisions/DECISIONS.md`. Resumen: modelo propio de AgentForge **MCP-compatible** (no MCP-native)
+en `packages/shared`, con `identity`/`qualified name`/`schema fingerprint` como conceptos de
+identidad separados y reglas explícitas de no-herencia automática; almacenamiento en configuración
+declarativa versionada + caché no autoritativa (sin base de datos); catálogo estático (orígenes
+configurados) + dinámico (descubrimiento), con la frontera Registry (cataloga) / Discovery (filtra,
+§6) / Policy Engine (autoriza, §7) mantenida estrictamente; módulo en
+`packages/core/src/registry/`, sin paquete propio. El resto de esta sección se conserva como
+contexto/inspiración original de la Fase 1, ya superado en el detalle por las decisiones de Fase 3.
+
+**PROPOSAL (contexto histórico, Fase 1 — ver DEC-013 a DEC-017 arriba para lo ya decidido):**
 
 - El Tool Registry es el catálogo de herramientas que AgentForge expone (vía sus servidores MCP
   propios), con: identificador único, schema de entrada/salida (JSON Schema, coherente con el
@@ -207,12 +218,9 @@ un simple allow/deny (p. ej. mostrar el diff exacto de lo que se va a ejecutar r
   de terceros que el usuario decida añadir a Claude Code directamente (que ya gestiona su propio
   catálogo vía `.mcp.json`, sin que AgentForge necesite duplicarlo).
 
-**OPEN QUESTION:** formato de definición concreto (YAML/JSON/TOML) y si el registro vive en
-ficheros de configuración versionados en git o en almacenamiento propio (base de datos local) —
-depende del volumen esperado de herramientas y del stack tecnológico (§17). **PROPOSAL
-preliminar:** empezar con definiciones en ficheros versionados en git (simple, auditable,
-coherente con el principio de transparencia de `README.md`), migrar a almacenamiento dedicado solo
-si el volumen lo justifica.
+~~**OPEN QUESTION:** formato de definición concreto (YAML/JSON/TOML) y si el registro vive en
+ficheros de configuración versionados en git o en almacenamiento propio (base de datos local)~~ —
+**resuelto en Fase 3, ver DEC-014.**
 
 ---
 
@@ -574,7 +582,10 @@ fases posteriores o al implementar)
    ambos desde el principio? (§1)
 2. Mecanismo de confirmación humana síncrona: ¿nativo de Claude Code o interfaz propia de
    AgentForge? (§4)
-3. Formato de definición del Tool Registry y dónde vive (ficheros vs. almacenamiento propio) (§5)
+3. ~~Formato de definición del Tool Registry y dónde vive (ficheros vs. almacenamiento propio)
+   (§5)~~ — **resuelto en Fase 3, ver DEC-013, DEC-014, DEC-017** (modelo propio MCP-compatible en
+   `packages/shared`; configuración declarativa + caché no autoritativa; módulo en
+   `packages/core/src/registry/`, sin paquete propio).
 4. Lenguaje de reglas del Policy Engine: ¿allowlists planas o algo más expresivo? (§7)
 5. ~~Mecanismo concreto de IPC entre AgentForge Core y el Secrets Broker (§3, §8, §18)~~ —
    **resuelto en Fase 2, ver DEC-010** (named pipe en Windows / Unix domain socket en Linux-macOS,

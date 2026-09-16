@@ -13,7 +13,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 0.5 | Fundamentos del proyecto y gobernanza | **En curso** |
 | 1 | Arquitectura y decisiones tecnológicas | **Completada** — 5 decisiones aprobadas (DEC-003 a DEC-007), base arquitectónica en `architecture/ARCHITECTURE.md` |
 | 2 | Arquitectura núcleo | **En curso** — 5 decisiones aprobadas (DEC-008 a DEC-012), esqueleto todavía no creado |
-| 3 | Tool Registry | Propuesta, no iniciada |
+| 3 | Tool Registry | **En curso** — 5 decisiones aprobadas (DEC-013 a DEC-017) |
 | 4 | Tool Discovery | Propuesta, no iniciada |
 | 5 | Permission / Policy Engine | Propuesta, no iniciada |
 | 6 | Secrets Broker | Propuesta, no iniciada |
@@ -64,6 +64,11 @@ de ellas.
   estricto + ESLint + Prettier + Vitest, y esqueleto de carpetas todavía sin crear. Sin
   funcionalidad todavía.
 - **Fase 3 — Tool Registry**: catálogo de herramientas disponibles (locales + remotas) con schema.
+  5 decisiones aprobadas (DEC-013 a DEC-017, ver `decisions/DECISIONS.md`): modelo de datos propio
+  MCP-compatible (no MCP-native), almacenamiento en configuración declarativa + caché no
+  autoritativa (sin SQLite), catálogo estático+dinámico con frontera explícita Registry/Discovery/
+  Policy Engine, identidad estable (`identity`/`qualified name`/`schema fingerprint`) con reglas de
+  no-herencia automática, y ubicación dentro de `packages/core` (sin paquete propio).
 - **Fase 4 — Tool Discovery**: mecanismo de descubrimiento/reducción de herramientas expuestas al
   contexto del agente (inspirado conceptualmente en el Tool Router de Composio, sin su código).
 - **Fase 5 — Permission / Policy Engine**: clasificación de acciones por riesgo/reversibilidad y

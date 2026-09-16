@@ -41,6 +41,22 @@ completo en `architecture/CORE-STRUCTURE-ANALYSIS.md`.
 - **Esqueleto de carpetas:** todavía NO creado — pendiente de un paso posterior explícitamente
   autorizado (DEC-012).
 
+**DECIDIDO (DEC-013 a DEC-017, Fase 3, 2026-09-16):** modelo de datos, almacenamiento, alcance,
+identidad/versionado y ubicación del Tool Registry — ver `decisions/DECISIONS.md`.
+
+- **Modelo de datos:** propio de AgentForge, **MCP-compatible** (no MCP-native ni independiente),
+  con adaptador MCP explícito en el borde de integración (DEC-013).
+- **Almacenamiento:** configuración declarativa versionable (fuente de verdad de orígenes y
+  metadatos propios) + caché ligera en fichero JSON, no autoritativa, sin SQLite (DEC-014).
+- **Alcance:** estático (orígenes configurados) + dinámico (descubrimiento contra cada origen),
+  con frontera explícita Registry (cataloga) / Discovery (filtra, Fase 4) / Policy Engine
+  (autoriza, Fase 5) (DEC-015).
+- **Identidad:** `identity` (interna, estable, generada solo por AgentForge) + `qualified name`
+  (`origen:nombre`, legible) + `schema fingerprint` (hash del contrato observado), con reglas de
+  no-herencia automática de identidad/autorización (DEC-016).
+- **Ubicación:** `packages/core/src/registry/`, modelo de datos en `packages/shared`, sin paquete
+  `packages/registry` propio (DEC-017).
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando

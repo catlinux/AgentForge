@@ -189,7 +189,17 @@ exact diff of what will run remotely).
 
 ## 5. Tool Registry model
 
-**PROPOSAL:**
+**DECISION (DEC-013 to DEC-017, Phase 3):** the Tool Registry's data model, storage, scope,
+identity/versioning, and monorepo location are already decided — see `decisions/DECISIONS.md`.
+Summary: AgentForge's own **MCP-compatible** (not MCP-native) data model in `packages/shared`,
+with `identity`/`qualified name`/`schema fingerprint` as separate identity concepts and explicit
+no-automatic-inheritance rules; storage as versioned declarative config + non-authoritative cache
+(no database); static (configured origins) + dynamic (discovery) catalog, with the Registry
+(catalogs) / Discovery (filters, §6) / Policy Engine (authorizes, §7) boundary strictly kept;
+module in `packages/core/src/registry/`, no dedicated package. The rest of this section is kept as
+the original Phase 1 context/inspiration, now superseded in detail by the Phase 3 decisions.
+
+**PROPOSAL (historical context, Phase 1 — see DEC-013 to DEC-017 above for what is now decided):**
 
 - The Tool Registry is the catalog of tools AgentForge exposes (via its own MCP servers), with:
   a unique identifier, input/output schema (JSON Schema, consistent with the format MCP uses —
@@ -206,11 +216,9 @@ exact diff of what will run remotely).
   add directly to Claude Code (which already manages its own catalog via `.mcp.json`, with no need
   for AgentForge to duplicate it).
 
-**OPEN QUESTION:** the concrete definition format (YAML/JSON/TOML) and whether the registry lives
-in git-versioned config files or in dedicated storage (a local database) — depends on the expected
-tool volume and the technology stack (§17). **Preliminary PROPOSAL:** start with git-versioned
-config files (simple, auditable, consistent with `README.md`'s transparency principle), migrate to
-dedicated storage only if volume justifies it.
+~~**OPEN QUESTION:** the concrete definition format (YAML/JSON/TOML) and whether the registry
+lives in git-versioned config files or in dedicated storage (a local database)~~ — **resolved in
+Phase 3, see DEC-014.**
 
 ---
 
@@ -559,7 +567,10 @@ during implementation)
    start? (§1)
 2. Synchronous human confirmation mechanism: native to Claude Code or AgentForge's own interface?
    (§4)
-3. Tool Registry definition format and where it lives (files vs. dedicated storage) (§5)
+3. ~~Tool Registry definition format and where it lives (files vs. dedicated storage) (§5)~~ —
+   **resolved in Phase 3, see DEC-013, DEC-014, DEC-017** (own MCP-compatible model in
+   `packages/shared`; declarative config + non-authoritative cache; module in
+   `packages/core/src/registry/`, no dedicated package).
 4. Policy Engine rule language: flat allowlists or something more expressive? (§7)
 5. ~~Exact IPC mechanism between AgentForge Core and the Secrets Broker (§3, §8, §18)~~ —
    **resolved in Phase 2, see DEC-010** (Windows named pipe / Linux-macOS Unix domain socket,
