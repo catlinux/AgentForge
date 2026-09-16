@@ -12,35 +12,36 @@ copiar).
 
 ## Fase actual
 
-**Fase 5 — Permission / Policy Engine**
+**Fase 6 — Secrets Broker**
 
-**Estado:** COMPLETADA (2026-09-16) — 7 decisiones aprobadas (DEC-023 a DEC-029, incluye
-DEC-023b: origen/granularidad de la clasificación de riesgo en configuración propia —nunca en
-`ToolEntry`—, motor de reglas derivado del riesgo con overrides simples, resultado ternario con
-razón estructurada, invalidación automática por cambio de `schemaFingerprint`, sin
-persistencia/auditoría propia, configuración JSON propia, ubicación dentro de `packages/core`).
-Implementación completa con tests. Ver `decisions/DECISIONS.md` para el registro formal.
+**Estado:** COMPLETADA (2026-09-16) — 7 decisiones aprobadas (DEC-030 a DEC-036: almacenamiento en
+fichero cifrado propio, modelo de secreto `SecretRecord`, clave maestra en fichero separado con
+arranque desatendido, API mínima justificada, identidad `SecretId` propia sin binding autodeclarado
+por Core, ubicación en `packages/secrets-broker` ya decidida por DEC-008, y **sin** evidencia
+criptográfica de autorización entre Policy Engine y Secrets Broker — con la limitación de seguridad
+resultante documentada explícitamente). Implementación completa con tests de seguridad. Ver
+`decisions/DECISIONS.md` para el registro formal.
 
-**Implementación:** Policy Engine funcional, de solo lectura sobre el Registry (Fase 3) e
-independiente de Discovery (Fase 4): modelo `RiskLevel`/`PolicyDecision` en
-`packages/shared/src/policy/`; `PolicyConfig`/`loadPolicyConfig`,
-`PolicyApprovalStore`/`InMemoryPolicyApprovalStore`, y `evaluate` (aplica DEC-023/DEC-023b/
-DEC-024/DEC-026) en `packages/core/src/policy/`. Fases 3 y 4 siguen vigentes y sin cambios —
-`ToolEntry`, Registry y Discovery no se han tocado.
+**Implementación:** Secrets Broker funcional a nivel de almacenamiento/API — cifrado AES-256-GCM,
+gestión de clave maestra, store de secretos, manejador de operaciones — **sin transporte IPC real
+todavía** (named pipe/Unix socket de DEC-010 sigue como placeholder, fuera de alcance de esta fase
+por decisión explícita, a implementar cuando Core↔Broker se conecten de verdad). Fases 3, 4 y 5
+siguen vigentes y sin cambios.
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
 **Arquitectura:** BASE ARQUITECTÓNICA APROBADA (Fase 1: DEC-003 a DEC-007) + ESTRUCTURA NÚCLEO
 APROBADA (Fase 2: DEC-008 a DEC-012) + TOOL REGISTRY APROBADO E IMPLEMENTADO (Fase 3: DEC-013 a
 DEC-017) + TOOL DISCOVERY APROBADO E IMPLEMENTADO (Fase 4: DEC-018 a DEC-022) + POLICY ENGINE
-APROBADO E IMPLEMENTADO (Fase 5: DEC-023 a DEC-029). Resto documentado como PROPOSAL/OPEN QUESTION
-en `architecture/ARCHITECTURE.md` §20.
+APROBADO E IMPLEMENTADO (Fase 5: DEC-023 a DEC-029) + SECRETS BROKER APROBADO E IMPLEMENTADO
+(Fase 6: DEC-030 a DEC-036). Resto documentado como PROPOSAL/OPEN QUESTION en
+`architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 5 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
-tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 6 (Secrets
-Broker) — sin implementar nada todavía.
+Fase 6 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
+tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 7 (Ejecución
+remota/SSH) — sin implementar nada todavía.
 
 ## Trabajo completado
 
@@ -343,6 +344,75 @@ decisión automática.
       coincidencias; `dist/`/`node_modules/`/`*.tsbuildinfo` correctamente ignorados; `git diff`
       confirma que Registry y Discovery no fueron tocados.
 
+### Fase 6 — Secrets Broker (completada, 2026-09-16)
+- [x] Análisis completo de la fase presentado en una única respuesta agrupada (13 puntos:
+      objetivo/responsabilidad, modelo de secretos, almacenamiento, clave maestra/bootstrap, IPC y
+      autenticación del cliente, API, identidad, least privilege, relación con Policy Engine,
+      relación con MCP/conectores futuros, threat model, backups/recuperación, decisiones
+      propuestas) — sin preguntas individuales, según lo pedido.
+- [x] Profundización adicional a petición del usuario, en dos puntos concretos, antes de aprobar:
+      (1) `allowedOrigins` autodeclarado por Core no protege frente a un Core comprometido (mismo
+      modelo de amenaza de DEC-004) — es falsa sensación de least privilege, se retira; (2)
+      evidencia de autorización entre Policy Engine y Secrets Broker: como Policy Engine vive en
+      el mismo proceso que Core (DEC-029), ningún mecanismo criptográfico generado por Policy
+      Engine puede protegerse de un Core comprometido que invoque `evaluate()` legítimamente — no
+      se implementa, con la limitación de seguridad documentada explícitamente en DECISIONS.md,
+      ARCHITECTURE.md §8 y DEVELOPMENT.md.
+- [x] **DEC-030** — Almacenamiento: fichero cifrado propio (AES-256-GCM), no OS credential store
+      — Linux Secret Service inviable en despliegue headless (Debian casa, VPS Contabo).
+- [x] **DEC-031** — Modelo: `SecretRecord { id, kind, payload, metadata }`, 5 kinds.
+- [x] **DEC-032** — Clave maestra: fichero separado, permisos de SO, arranque desatendido, pérdida
+      irrecuperable por diseño.
+- [x] **DEC-033** — API: `get`/`create`/`update`/`delete`/`exists`/`listMetadata`, sin rotación
+      automática ni versionado histórico.
+- [x] **DEC-034 (revisada)** — `SecretId` propio (no reutiliza `ToolIdentity`); sin binding
+      `allowedOrigins` autodeclarado por Core.
+- [x] **DEC-035** — Ubicación: `packages/secrets-broker/src/` (confirmación de DEC-008/DEC-004,
+      no decisión nueva de fondo).
+- [x] **DEC-036** — Sin evidencia criptográfica de autorización Policy Engine↔Secrets Broker en
+      esta fase; limitación de seguridad documentada.
+- [x] `decisions/DECISIONS.md`, `STATE.md`, `ROADMAP.md`, `DEVELOPMENT.md`,
+      `architecture/ARCHITECTURE.md`/`.en.md` (§8 y §20) sincronizados con DEC-030 a DEC-036,
+      incluyendo la corrección explícita de que el almacenamiento NO depende de Windows Credential
+      Manager (contradiciendo una PROPOSAL heredada de Fase 1 que sí lo asumía).
+- [x] Decisión de alcance resuelta con el usuario antes de escribir código de transporte (no
+      decidida silenciosamente): el transporte IPC real (named pipe/Unix socket, DEC-010) queda
+      **fuera del alcance de esta fase** — se implementa el store/API del Broker; el placeholder
+      de `packages/secrets-broker/src/transport/` permanece sin cambios, a implementar cuando
+      Core↔Broker se conecten de verdad.
+- [x] Implementación: `packages/shared/src/secrets/` — `identity.ts` (`SecretId`), `record.ts`
+      (`SecretKind`, `SecretRecord`, `SecretMetadata`, `SecretMetadataView`), `api.ts`
+      (`SecretsBrokerOperation`, `SecretsBrokerResult`). `packages/secrets-broker/src/storage/` —
+      `crypto.ts` (AES-256-GCM, IV fresco por operación, tag separado del ciphertext),
+      `master-key.ts` (`MasterKeyStore`, permisos 0o600, `assertRestrictivePermissions`),
+      `secret-store.ts` (`SecretStore`, fichero cifrado, manejo explícito de corrupción).
+      `packages/secrets-broker/src/ipc/` — `handle-operation.ts` (`handleOperation`: valida
+      entradas, nunca filtra detalle en errores, sin binding, sin evidencia — desacoplado de
+      cualquier transporte concreto).
+- [x] Tests (Vitest): 29 nuevos — 6 de `crypto` (round-trip, IV nunca reutilizado, tag separado,
+      detección de manipulación, error sin fuga de plaintext, rechazo de clave de longitud
+      incorrecta); 5 de `MasterKeyStore` (creación/persistencia, reutilización, fichero corrupto,
+      2 de permisos POSIX con `skipIf` en Windows); 10 de `SecretStore` (CRUD completo, el fichero
+      en disco nunca contiene el valor en claro, `listMetadata` nunca incluye `payload`, fichero
+      corrupto, clave incorrecta falla explícitamente); 10 de `handleOperation` (validación de
+      entradas, ronda completa create→get, `exists`, `list-metadata` sin fuga, error interno
+      degradado a mensaje genérico sin detalles internos, test explícito de que no existe ningún
+      campo tipo `allowedOrigins` en el contrato — DEC-034).
+- [x] Alcance respetado: no se ejecutan tools, no hay adaptador MCP real, no hay Sessions, no hay
+      Audit Log persistente, no hay Policy Engine nuevo/separado, no se implementó el transporte
+      IPC real (por decisión explícita del usuario). `ToolEntry`/Registry/Discovery/Policy Engine
+      quedan intactos (verificado por `git diff` vacío sobre esos ficheros).
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 3 paquetes; `pnpm run lint` sin
+      errores; `pnpm run format` correcto (tras `--write` sobre 2 ficheros, más una corrección de
+      una aserción de test incorrecta, no de la lógica); `pnpm run test` — 68/68 tests correctos
+      (2 tests de permisos POSIX omitidos correctamente en Windows) (29 nuevos + 39 previos);
+      `pnpm run build` correcto; `pnpm install --frozen-lockfile` correcto (sin dependencias
+      nuevas — solo `node:crypto`/`node:fs`/`node:path`/`node:os`); grep de secretos hardcodeados
+      sin coincidencias; grep de `console.*` en todo el módulo del Broker sin coincidencias
+      (cero logging, coherente con DEC-027/§1); `dist/`/`node_modules/`/`*.tsbuildinfo`
+      correctamente ignorados; `git diff` confirma que Registry, Discovery, Policy Engine y el
+      placeholder de transporte no fueron tocados.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -403,6 +473,14 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-027** — Sin persistencia ni auditoría propia del Policy Engine.
 - **DEC-028** — Configuración declarativa en JSON propio, separado de Registry y Discovery.
 - **DEC-029** — Ubicación: `packages/core/src/policy/`, sin paquete propio.
+- **DEC-030** — Almacenamiento: fichero cifrado propio (AES-256-GCM), no OS credential store.
+- **DEC-031** — Modelo de secreto: `SecretRecord` con `kind`/`payload`/`metadata`.
+- **DEC-032** — Clave maestra: fichero separado, permisos de SO, arranque desatendido.
+- **DEC-033** — API del Secrets Broker: `get`/`create`/`update`/`delete`/`exists`/`listMetadata`.
+- **DEC-034 (revisada)** — `SecretId` propio, sin binding `allowedOrigins` autodeclarado por Core.
+- **DEC-035** — Ubicación: `packages/secrets-broker/src/` (confirmación de DEC-008/DEC-004).
+- **DEC-036** — Sin evidencia criptográfica de autorización Policy Engine↔Secrets Broker; límite
+  de seguridad documentado explícitamente.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -494,33 +572,33 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `624581e60f5e165e702d0de4ca5c2c125f0395ab` (corto: `624581e`)
+- Hash: `2411dc3274833cee0b908e7c76787fbd47b03b91` (corto: `2411dc3`)
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `feat+docs: implementa el Tool Discovery — Fase 4 (DEC-018 a DEC-022)`
-- Contenido: 17 archivos, 418 inserciones/40 eliminaciones — modelo `DiscoveredToolView` en
-  `packages/shared/src/discovery/`; `DiscoveryConfig`/`DiscoveryStrategy`/
-  `StaticConfigDiscoveryStrategy`/`discoverTools` en `packages/core/src/discovery/` con 7 tests
-  nuevos (22 en total); `DEVELOPMENT.md`, `ROADMAP.md`, `STATE.md`,
-  `architecture/ARCHITECTURE.md`/`.en.md`, `decisions/DECISIONS.md` (actualizados con DEC-018 a
-  DEC-022).
-- Commits anteriores: `1399053` (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17`
-  (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
+- Mensaje: `feat+docs: implementa el Policy Engine — Fase 5 (DEC-023 a DEC-029)`
+- Contenido: 19 archivos, 804 inserciones/53 eliminaciones — modelo `RiskLevel`/`PolicyDecision`
+  en `packages/shared/src/policy/`; `PolicyConfig`/`PolicyApprovalStore`/`evaluate` en
+  `packages/core/src/policy/` con 17 tests nuevos (39 en total); `DEVELOPMENT.md`, `ROADMAP.md`,
+  `STATE.md`, `architecture/ARCHITECTURE.md`/`.en.md`, `decisions/DECISIONS.md` (actualizados con
+  DEC-023 a DEC-029).
+- Commits anteriores: `624581e` (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2), `2922629`
+  (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
 
 ## Estado del push
 
 - **Realizado** (2026-09-16, con autorización explícita del usuario). `master` sincronizado con
-  `origin/master` (`624581e`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
+  `origin/master` (`2411dc3`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
   al mismo hash).
 
 ## Próxima acción recomendada
 
-1. Pedir autorización explícita para el commit+push de los cambios de la Fase 5 (DEC-023 a
-   DEC-029, implementación del Policy Engine, documentación sincronizada).
+1. Pedir autorización explícita para el commit+push de los cambios de la Fase 6 (DEC-030 a
+   DEC-036, implementación del Secrets Broker, documentación sincronizada).
 2. Tras el commit/push, presentar únicamente el resumen de objetivos y decisiones a analizar de la
-   Fase 6 (Secrets Broker) — sin implementar nada de esa fase todavía.
+   Fase 7 (Ejecución remota/SSH) — sin implementar nada de esa fase todavía.
 3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
-   `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`.
+   `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`; el transporte IPC real
+   (named pipe/Unix socket, DEC-010) sigue sin implementar, fuera de alcance de la Fase 6.
 
 ## Cómo reprender este trabajo
 

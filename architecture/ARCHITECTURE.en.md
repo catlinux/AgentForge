@@ -306,7 +306,23 @@ overrides.
 system user and permissions** — it never shares process space or OS identity with the
 agent/Claude Code.
 
-**PROPOSAL built on this:**
+**DECISION (DEC-030 to DEC-036, Phase 6):** storage, secret model, master key, API,
+identity/access control, and authorization evidence are already decided — see
+`decisions/DECISIONS.md`. Summary: **own encrypted file** (AES-256-GCM, not relying on Windows
+Credential Manager or any OS credential store — corrects the PROPOSAL below, which assumed
+Credential Manager without having evaluated its unavailability in headless Linux deployments);
+`SecretRecord` model with 5 kinds; master key in a separate file with OS permissions, unattended
+startup; minimal API `get`/`create`/`update`/`delete`/`exists`/`listMetadata`; own `SecretId`
+with no self-declared binding from Core. **Explicitly documented security limitation (DEC-036):**
+with the Policy Engine (§7) running in the same process as Core (DEC-029), it cannot act as an
+independent authority against a compromised Core — the Secrets Broker protects storage and
+prevents direct access to secrets outside its own process, but it cannot prevent a compromised
+Core from obtaining secrets through the legitimate authorization flow already available to it.
+Closing that gap for real would require separating Policy Engine from Core into another process —
+a larger decision, not made here, a candidate for a future hardening phase (Phase 13).
+
+**PROPOSAL (historical context, Phase 1 — see DEC-030 to DEC-036 above for what is now decided,
+including the correction on the storage mechanism):**
 
 - **SSH key and passphrase storage:** Windows Credential Manager, accessed only by the Secrets
   Broker process (not by the process hosting the agent, nor directly by the Execution Backend) —
@@ -330,8 +346,8 @@ agent/Claude Code.
   self-hosting of its secrets-management capabilities — an additional reason not to depend on a
   third-party tool of this kind).
 
-**OPEN QUESTION:** exact IPC mechanism between AgentForge Core and the Secrets Broker (see §3) —
-pending the technology stack (§17).
+~~**OPEN QUESTION:** exact IPC mechanism between AgentForge Core and the Secrets Broker (see
+§3)~~ — **resolved in Phase 2 (DEC-010) and Phase 6 (DEC-030 to DEC-036).**
 
 ---
 

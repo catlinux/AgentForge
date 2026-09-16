@@ -570,6 +570,157 @@ Format per a cada decisió futura:
 - Consecuencias: mismas que DEC-017/DEC-022 — no existe hoy ninguna razón de aislamiento de
   proceso/seguridad que justifique un paquete separado.
 
+## DEC-030 — Almacenamiento de secretos (Fase 6)
+
+- Fecha: 2026-09-16
+- Contexto: DEC-004 exige que el Secrets Broker sea un proceso separado con usuario de SO propio;
+  DEC-010 fija el transporte IPC (named pipe/Unix socket). Faltaba decidir cómo persiste el
+  Broker los secretos, evaluando explícitamente si el proyecto debe depender de un OS credential
+  store (mencionado como pendiente en DEC-007/`DEVELOPMENT.md`) o de un mecanismo propio, sin
+  asumir una solución.
+- Opciones consideradas: (A) fichero cifrado propio (AES-256-GCM vía `node:crypto`, sin
+  dependencia externa); (B) OS credential store / keychain (Windows Credential Manager, macOS
+  Keychain, Linux Secret Service); (C) combinación (OS store solo para la clave maestra).
+- Decisión: **(A) fichero cifrado propio**. Se descarta (B) como mecanismo de almacenamiento de
+  secretos porque Linux Secret Service depende de una sesión de escritorio con keyring
+  desbloqueado, indisponible en el escenario real de despliegue sin entorno gráfico (Debian de
+  casa, VPS Contabo) ya previsto en el proyecto — (B) sería además tres implementaciones
+  divergentes por SO, contrario a "avoid unnecessary complexity" y a la portabilidad que (A) da
+  de forma uniforme en Windows/Linux/macOS.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa, tras análisis explícito de
+  seguridad/portabilidad/dependencias/complejidad operativa de las 3 alternativas).
+- Consecuencias: resuelve explícitamente la pregunta que `DEVELOPMENT.md`/`TECH-STACK-ANALYSIS.md`
+  dejaban pendiente sobre el paquete de acceso a Windows Credential Manager — no se necesita
+  ninguna dependencia nativa de keychain. El acceso al almacenamiento pasa siempre por una
+  interfaz interna del Broker, dejando abierta (sin implementarla) una futura sustitución del
+  backend (p. ej. HSM) si se justificara.
+
+## DEC-031 — Modelo de secreto (Fase 6)
+
+- Fecha: 2026-09-16
+- Contexto: había que definir un modelo interno mínimo y extensible para los tipos de secreto
+  identificados (API keys, tokens, credenciales usuario/contraseña, material SSH), sin
+  sobrearquitectura de una clase por tipo ni un blob totalmente opaco.
+- Opciones consideradas: clase TypeScript distinta por tipo de secreto; blob opaco sin
+  estructura; `SecretRecord` con `kind` discriminador + `payload: Record<string,string>` de forma
+  convencional por `kind` + `metadata`.
+- Decisión: **`SecretRecord { id, kind, payload, metadata }`**, con `kind` ∈ `"api-key"` |
+  `"token"` | `"credential"` | `"ssh-key"` | `"generic"`, y `payload` como diccionario de cadenas
+  con forma esperada por `kind` (documentada, no forzada por tipos TS distintos).
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: añadir un `kind` nuevo es una convención de claves dentro de `payload`, no una
+  migración de schema. Fase 7/8 consumirán esta forma directamente.
+
+## DEC-032 — Clave maestra y bootstrap (Fase 6)
+
+- Fecha: 2026-09-16
+- Contexto: la seguridad de DEC-030 depende enteramente de cómo se protege la clave de cifrado.
+  Había que decidir dónde vive, qué ocurre tras reinicios, y si requiere intervención humana.
+- Opciones consideradas: (B1) derivada de una passphrase humana en cada arranque del Broker; (B2)
+  almacenada en el OS credential store (solo la clave, no los secretos); (B3) fichero de clave
+  separado, con permisos de SO restringidos al usuario del Broker (DEC-004), sin passphrase
+  humana; (B4) B3 por defecto con opción futura de habilitar B1.
+- Decisión: **(B3)**. Fichero de clave separado del fichero de secretos cifrados, con permisos de
+  SO restringidos exclusivamente al usuario del Broker. Arranque desatendido: el Broker relee la
+  clave al iniciar, sin intervención humana, tanto tras un reinicio del proceso como de la
+  máquina. La pérdida de la clave es **irrecuperable por diseño** — no hay backdoor. (B1) queda
+  explícitamente fuera de alcance de esta fase.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: coherente con "un solo desarrollador, evitar complejidad prematura". Determina un
+  requisito operacional explícito de backup: la clave debe respaldarse por separado del fichero de
+  secretos cifrados (ver `SECURITY.md`/documentación operacional), para que un único backup
+  comprometido no contenga material suficiente para descifrar. (B1) queda como ampliación futura
+  posible, no bloqueante.
+
+## DEC-033 — API del Secrets Broker (Fase 6)
+
+- Fecha: 2026-09-16
+- Contexto: había que definir las operaciones mínimas justificadas, sin añadir funcionalidad
+  especulativa.
+- Opciones consideradas: conjunto mínimo (`get`/`create`/`update`/`delete`/`exists`) vs. conjunto
+  ampliado con rotación automática y versionado histórico vs. conjunto mínimo +
+  `listMetadata` (sin exponer valores).
+- Decisión: **`get`, `create`, `update`, `delete`, `exists`, `listMetadata`**. Sin rotación
+  automática ni versionado histórico — ninguna tiene caso de uso concreto en esta fase.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa).
+- Consecuencias: Fase 7 consumirá `get`; una futura herramienta de administración consumiría
+  `listMetadata`/`create`/`update`/`delete`. Ampliar la API más adelante es aditivo.
+
+## DEC-034 — Identidad de secretos y control de acceso (Fase 6, revisada)
+
+- Fecha: 2026-09-16
+- Contexto: había que decidir cómo se identifican los secretos (sin reutilizar `ToolIdentity`,
+  entidad conceptualmente distinta) y si el Broker debía aplicar algún control de acceso más
+  granular que el aislamiento de proceso ya dado por DEC-004/DEC-010. Un primer análisis propuso
+  un binding opcional `allowedOrigins` validado contra el `ToolOrigin`/`identity` que Core declara
+  en la petición; el usuario señaló correctamente que, si Core está comprometido, no puede
+  considerarse fiable un dato que el propio Core declara sobre sí mismo — ese binding sería una
+  falsa sensación de least privilege, no protección real frente al modelo de amenaza de DEC-004.
+- Opciones consideradas para el binding: (A1) sin binding en esta fase; (A2) binding contra
+  `ToolIdentity` en vez de `ToolOrigin` (mismo defecto de fondo: sigue siendo autodeclarado por
+  Core); (A3) evidencia de autorización verificable generada por Policy Engine — analizada y
+  resuelta en DEC-036 (no implementable de forma que cierre la brecha, dado que Policy Engine
+  corre en el mismo proceso que Core, DEC-029).
+- Decisión: **identidad** — `SecretId` opaco, interno, generado por el Broker (mismo patrón que
+  `ToolIdentity`, pero entidad distinta y no reutilizada), con `metadata.provider?` y
+  `metadata.label` (nombre legible, mutable, no identidad). **Control de acceso** — **(A1) sin
+  binding secreto↔origen/identity autodeclarado por Core en esta fase.** Se retira el
+  `allowedOrigins` propuesto inicialmente. El control de acceso real en esta fase es el que ya da
+  DEC-004 (aislamiento de proceso/usuario) + DEC-010 (canal IPC autenticado por SO) — no se añade
+  ningún binding de aplicación adicional que dependa de datos autodeclarados por Core.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa, tras análisis explícito de las
+  alternativas de binding y sus implicaciones de seguridad).
+- Consecuencias: el Broker entrega cualquier secreto por `SecretId` a cualquier petición ya
+  autenticada por el canal IPC (DEC-010) — sin capa adicional que pudiera aparentar más
+  granularidad de la que realmente aporta. Ver DEC-036 para la limitación de seguridad
+  relacionada, documentada explícitamente. Un futuro mecanismo de control de acceso más granular
+  (si se justificara) requeriría resolver primero el problema de fondo señalado en DEC-036, no
+  solo añadir un campo de configuración.
+
+## DEC-035 — Ubicación del Secrets Broker en el monorepo (Fase 6)
+
+- Fecha: 2026-09-16
+- Contexto: a diferencia de Registry/Discovery/Policy Engine (DEC-017/DEC-022/DEC-029), el Secrets
+  Broker ya tiene paquete propio decidido desde la Fase 2 (`packages/secrets-broker`, DEC-008),
+  como consecuencia directa de DEC-004. No hay pregunta real de "paquete propio o módulo en core"
+  que resolver aquí.
+- Opciones consideradas: ninguna — se confirma la aplicación de DEC-008, no se reabre.
+- Decisión: la implementación de la Fase 6 vive en `packages/secrets-broker/src/`, consumiendo el
+  modelo compartido de `packages/shared`, mismo patrón que las fases anteriores.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa) — confirmación, no decisión nueva de
+  fondo.
+- Consecuencias: ninguna nueva — refuerza DEC-004/DEC-008 tal como ya estaban aprobados.
+
+## DEC-036 — Evidencia de autorización entre Policy Engine y Secrets Broker (Fase 6)
+
+- Fecha: 2026-09-16
+- Contexto: se analizó si el Secrets Broker debía exigir una evidencia de autorización verificable
+  (generada por Policy Engine) antes de entregar un secreto, en vez de confiar simplemente en que
+  la petición llega por el canal IPC autenticado (DEC-010). Se determinó que, como Policy Engine
+  vive dentro de `packages/core/src/policy/` — es decir, en el **mismo proceso y usuario de SO que
+  Core** (DEC-029) —, ningún mecanismo de evidencia generado por Policy Engine puede protegerse de
+  un Core comprometido: un atacante con control de Core podría invocar `evaluate()` directamente y
+  obtener una autorización legítima y verdadera para cualquier `identity` que decida, sin
+  necesidad de falsificar nada.
+- Opciones consideradas: (a) implementar un mecanismo criptográfico de evidencia (firma/HMAC) que
+  el Broker valida antes de entregar un secreto; (b) no implementar ningún mecanismo de evidencia
+  en esta fase, documentando explícitamente la limitación de seguridad resultante.
+- Decisión: **(b)**. El Secrets Broker no exige ni valida ninguna evidencia criptográfica de
+  autorización en esta fase — confía en que toda petición que llega por el canal IPC autenticado
+  por SO (DEC-010) proviene del código legítimo de Core.
+- Aprobado por: usuario (2026-09-16, vía respuesta directa, con instrucción explícita de mantener
+  documentada la limitación de seguridad identificada).
+- Consecuencias — **limitación de seguridad documentada explícitamente**: con Policy Engine dentro
+  del mismo proceso que Core, Policy Engine no puede actuar como una autoridad independiente frente
+  a un Core comprometido. El Secrets Broker protege el almacenamiento e impide el acceso directo a
+  los secretos fuera del proceso Broker (mediante DEC-004: aislamiento de proceso/usuario,
+  impidiendo lectura directa del fichero cifrado y de la clave maestra desde Core), pero **no puede
+  impedir que un Core comprometido obtenga secretos a través del flujo de autorización legítimo que
+  ya tiene disponible** (invocar Policy Engine directamente, que es código legítimo compartiendo su
+  proceso). Cerrar esa brecha de forma real exigiría separar Policy Engine de Core en un proceso
+  distinto — una decisión arquitectónica mayor, explícitamente no propuesta ni decidida aquí, que
+  quedaría para una futura fase de hardening (Fase 13) si se decide abordarla.
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -609,6 +760,13 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 - ~~Persistencia y auditoría del Policy Engine (Fase 5)~~ → DEC-027.
 - ~~Configuración declarativa del Policy Engine (Fase 5)~~ → DEC-028.
 - ~~Ubicación del Policy Engine en el monorepo (Fase 5)~~ → DEC-029.
+- ~~Almacenamiento de secretos (Fase 6)~~ → DEC-030.
+- ~~Modelo de secreto (Fase 6)~~ → DEC-031.
+- ~~Clave maestra y bootstrap (Fase 6)~~ → DEC-032.
+- ~~API del Secrets Broker (Fase 6)~~ → DEC-033.
+- ~~Identidad de secretos y control de acceso (Fase 6)~~ → DEC-034.
+- ~~Ubicación del Secrets Broker en el monorepo (Fase 6)~~ → DEC-035.
+- ~~Evidencia de autorización entre Policy Engine y Secrets Broker (Fase 6)~~ → DEC-036.
 
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):

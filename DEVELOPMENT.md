@@ -91,6 +91,33 @@ Engine — ver `decisions/DECISIONS.md`.
 - **Configuración:** fichero JSON propio, separado de Registry y Discovery (DEC-028).
 - **Ubicación:** `packages/core/src/policy/`, sin paquete propio (DEC-029).
 
+**DECIDIDO (DEC-030 a DEC-036, Fase 6, 2026-09-16):** almacenamiento, modelo de secreto, clave
+maestra, API, identidad/control de acceso, ubicación, y evidencia de autorización del Secrets
+Broker — ver `decisions/DECISIONS.md`.
+
+- **Almacenamiento:** fichero cifrado propio (AES-256-GCM vía `node:crypto`, sin dependencia de
+  OS credential store) — Linux Secret Service no es viable en el despliegue headless previsto
+  (DEC-030).
+- **Modelo:** `SecretRecord { id, kind, payload, metadata }`, `kind` ∈ `api-key`/`token`/
+  `credential`/`ssh-key`/`generic` (DEC-031).
+- **Clave maestra:** fichero separado, permisos de SO restringidos al usuario del Broker,
+  arranque desatendido sin passphrase humana; pérdida de la clave es irrecuperable por diseño
+  (DEC-032).
+- **API:** `get`, `create`, `update`, `delete`, `exists`, `listMetadata` — sin rotación automática
+  ni versionado histórico (DEC-033).
+- **Identidad y control de acceso:** `SecretId` opaco propio (no reutiliza `ToolIdentity`); sin
+  binding `allowedOrigins` autodeclarado por Core — sería falsa sensación de least privilege
+  frente a un Core comprometido (DEC-034).
+- **Ubicación:** `packages/secrets-broker/src/` (ya decidido por DEC-008/DEC-004), sin cambios
+  (DEC-035).
+- **Evidencia de autorización:** **no implementada en esta fase** — el Broker confía en el canal
+  IPC autenticado por SO (DEC-010). **Limitación de seguridad documentada explícitamente:** Policy
+  Engine corre en el mismo proceso que Core (DEC-029), por lo que no puede actuar como autoridad
+  independiente frente a un Core comprometido; el Broker protege el almacenamiento y evita el
+  acceso directo a los secretos fuera de su propio proceso, pero no puede impedir que un Core
+  comprometido obtenga secretos a través del flujo de autorización legítimo ya disponible
+  (DEC-036).
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando

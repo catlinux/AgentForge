@@ -16,7 +16,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 3 | Tool Registry | **En curso** — 5 decisiones aprobadas (DEC-013 a DEC-017) |
 | 4 | Tool Discovery | **En curso** — 5 decisiones aprobadas (DEC-018 a DEC-022) |
 | 5 | Permission / Policy Engine | **En curso** — 7 decisiones aprobadas (DEC-023 a DEC-029, incluye DEC-023b) |
-| 6 | Secrets Broker | Propuesta, no iniciada |
+| 6 | Secrets Broker | **En curso** — 7 decisiones aprobadas (DEC-030 a DEC-036) |
 | 7 | Ejecución remota / SSH | Propuesta, no iniciada |
 | 8 | Integración MCP | Propuesta, no iniciada |
 | 9 | Sessions | Propuesta, no iniciada |
@@ -86,7 +86,15 @@ de ellas.
   automática de aprobación ante cambio de `schemaFingerprint`; sin persistencia/auditoría propia;
   configuración en fichero JSON propio; ubicación dentro de `packages/core`.
 - **Fase 6 — Secrets Broker**: gestión de credenciales (claves SSH, tokens) nunca expuestas
-  directamente al agente.
+  directamente al agente. 7 decisiones aprobadas (DEC-030 a DEC-036, ver
+  `decisions/DECISIONS.md`): almacenamiento en fichero cifrado propio (AES-256-GCM), modelo de
+  secreto `SecretRecord` con 5 kinds, clave maestra en fichero separado con permisos de SO
+  (arranque desatendido, pérdida irrecuperable por diseño), API mínima
+  `get`/`create`/`update`/`delete`/`exists`/`listMetadata`, `SecretId` propio sin binding
+  autodeclarado por Core, y **sin** evidencia criptográfica de autorización entre Policy Engine y
+  Secrets Broker en esta fase — con la limitación de seguridad resultante documentada
+  explícitamente (Policy Engine comparte proceso con Core, DEC-029, así que no puede actuar como
+  autoridad independiente frente a un Core comprometido).
 - **Fase 7 — Ejecución remota / SSH**: ejecutor SSH controlado y auditado hacia Debian de casa y
   VPS Contabo (sin tocar esos sistemas hasta que esta fase esté explícitamente autorizada).
 - **Fase 8 — Integración MCP**: servidor(es) MCP propio(s) y/o hooks de Claude Code.
