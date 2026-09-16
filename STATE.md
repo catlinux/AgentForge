@@ -12,21 +12,21 @@ copiar).
 
 ## Fase actual
 
-**Fase 6 — Secrets Broker**
+**Fase 7 — Ejecución remota / SSH**
 
-**Estado:** COMPLETADA (2026-09-16) — 7 decisiones aprobadas (DEC-030 a DEC-036: almacenamiento en
-fichero cifrado propio, modelo de secreto `SecretRecord`, clave maestra en fichero separado con
-arranque desatendido, API mínima justificada, identidad `SecretId` propia sin binding autodeclarado
-por Core, ubicación en `packages/secrets-broker` ya decidida por DEC-008, y **sin** evidencia
-criptográfica de autorización entre Policy Engine y Secrets Broker — con la limitación de seguridad
-resultante documentada explícitamente). Implementación completa con tests de seguridad. Ver
-`decisions/DECISIONS.md` para el registro formal.
+**Estado:** COMPLETADA (2026-09-17) — 6 decisiones aprobadas (DEC-037 a DEC-042: comandos con
+plantilla fija por tool, confirmación humana síncrona propia de Execution con hash determinista/
+un solo uso/timeout/rechazo por defecto tras descartar los hooks de Claude Code por verificación
+técnica, configuración de hosts en JSON propio, límites de stdout/stderr sin loguear contenido,
+timeout de conexión SSH con cierre forzado, y paquete propio `packages/execution-ssh`).
+Implementación completa con tests de seguridad. Ver `decisions/DECISIONS.md` para el registro
+formal.
 
-**Implementación:** Secrets Broker funcional a nivel de almacenamiento/API — cifrado AES-256-GCM,
-gestión de clave maestra, store de secretos, manejador de operaciones — **sin transporte IPC real
-todavía** (named pipe/Unix socket de DEC-010 sigue como placeholder, fuera de alcance de esta fase
-por decisión explícita, a implementar cuando Core↔Broker se conecten de verdad). Fases 3, 4 y 5
-siguen vigentes y sin cambios.
+**Implementación:** Execution SSH funcional — plantillas de comando, confirmación humana con
+`ConfirmationChannel`/`ReadlineConfirmationChannel`, cliente SSH (`ssh2`) con timeout y
+truncado de salida, orquestador que consume `PolicyDecision` (Fase 5) y `SecretRecord` de
+`kind: "ssh-key"` (Fase 6) — **ningún sistema remoto real tocado**, tests con SSH mockeado.
+Fases 3 a 6 siguen vigentes y sin cambios.
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
@@ -34,14 +34,14 @@ siguen vigentes y sin cambios.
 APROBADA (Fase 2: DEC-008 a DEC-012) + TOOL REGISTRY APROBADO E IMPLEMENTADO (Fase 3: DEC-013 a
 DEC-017) + TOOL DISCOVERY APROBADO E IMPLEMENTADO (Fase 4: DEC-018 a DEC-022) + POLICY ENGINE
 APROBADO E IMPLEMENTADO (Fase 5: DEC-023 a DEC-029) + SECRETS BROKER APROBADO E IMPLEMENTADO
-(Fase 6: DEC-030 a DEC-036). Resto documentado como PROPOSAL/OPEN QUESTION en
-`architecture/ARCHITECTURE.md` §20.
+(Fase 6: DEC-030 a DEC-036) + EJECUCIÓN REMOTA/SSH APROBADA E IMPLEMENTADA (Fase 7: DEC-037 a
+DEC-042). Resto documentado como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 6 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
-tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 7 (Ejecución
-remota/SSH) — sin implementar nada todavía.
+Fase 7 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
+tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 8
+(Integración MCP) — sin implementar nada todavía.
 
 ## Trabajo completado
 
@@ -413,6 +413,107 @@ decisión automática.
       correctamente ignorados; `git diff` confirma que Registry, Discovery, Policy Engine y el
       placeholder de transporte no fueron tocados.
 
+### Fase 7 — Ejecución remota / SSH (completada, 2026-09-17)
+- [x] Análisis completo de la fase presentado en una única respuesta agrupada (objetivo/alcance,
+      relación con fases anteriores, arquitectura/flujo, 6 decisiones con
+      alternativas/ventajas/desventajas/impacto, límites explícitos, riesgos, tests previstos) —
+      sin preguntas individuales, según lo pedido, siguiendo protocolo INSPECT→PLAN→EXECUTE→
+      VERIFY→DOCUMENT.
+- [x] Verificación técnica explícita de los hooks de Claude Code (`PreToolUse`) contra
+      documentación oficial (`hooks-guide.md`, `hooks.md`, `permissions.md`) antes de aprobar
+      DEC-038: confirmado que son síncronos de un solo disparo, sin pausa-y-reanudación con estado
+      externo, y sin señal verificable de aprobación humana hacia procesos externos — B2 (hooks)
+      descartada, reemplazada por B3 (interfaz propia de Execution).
+- [x] Profundización adicional a petición del usuario sobre las garantías concretas de B3 antes de
+      aprobar: vinculación por hash determinista, no-reutilización, qué puede/no puede confiarse
+      de un Core comprometido, timeout/cancelación/rechazo por defecto, problemas prácticos con
+      modos no interactivos de Claude Code, y si posponer `requires-confirmation` sería preferible
+      (se concluyó que no, con la limitación de "operador presente" documentada explícitamente).
+- [x] Ajuste de diseño acordado antes de EXECUTE (no nueva decisión arquitectónica): separación de
+      la lógica de seguridad de DEC-038 (hash, un solo uso, timeout, rechazo por defecto) del
+      mecanismo concreto de interacción, mediante la interfaz `ConfirmationChannel` con
+      `ReadlineConfirmationChannel` como única implementación de esta fase — mismo patrón ya
+      aplicado en DEC-010 y DEC-013.
+- [x] **DEC-037** — Comandos: plantilla fija por tool con parámetros tipados, nunca shell
+      arbitraria ni argumentos libres.
+- [x] **DEC-038** — Confirmación humana síncrona propia de Execution: hash determinista
+      (identity+parámetros+host+schemaFingerprint), un solo uso, timeout, rechazo por defecto,
+      comando/host reales mostrados desde la configuración propia de Execution.
+- [x] **DEC-039** — Configuración de hosts remotos en fichero JSON propio.
+- [x] **DEC-040** — Límites de tamaño en stdout/stderr, nunca logueados en claro.
+- [x] **DEC-041** — Timeout de conexión SSH configurable, cierre forzado al expirar.
+- [x] **DEC-042** — Ubicación: `packages/execution-ssh`, paquete propio (patrón ya reservado por
+      DEC-008).
+- [x] `decisions/DECISIONS.md`, `STATE.md`, `ROADMAP.md`, `DEVELOPMENT.md`,
+      `architecture/ARCHITECTURE.md`/`.en.md` (§9 y §20) sincronizados con DEC-037 a DEC-042,
+      incluyendo la resolución explícita de la pregunta abierta de Fase 1 sobre el mecanismo de
+      confirmación humana.
+- [x] Implementación: `packages/shared/src/execution/` — `request.ts` (`ExecutionRequest`),
+      `result.ts` (`ExecutionOutcome`). `packages/execution-ssh/src/` — `config/` (plantillas de
+      comando, configuración de hosts), `confirmation/` (hash de operación, interfaz
+      `ConfirmationChannel`, implementación `readline`, lógica de confirmación con las 5
+      garantías), `ssh/` (cliente `ssh2` con timeout, truncado de salida), `execute.ts`
+      (orquestador: deny→rechaza, requires-confirmation→confirma primero, allow→ejecuta).
+- [x] Nueva dependencia de producción: `ssh2` (primera dependencia externa de producción del
+      proyecto), ya identificada como candidata verificada en `TECH-STACK-ANALYSIS.md` (Fase 1) —
+      no es una decisión nueva, aplicación de investigación ya hecha. El binding nativo de cifrado
+      opcional de `ssh2` no compiló en esta máquina Windows (falta de toolchain ClangCL) — `ssh2`
+      lo trata como opcional y cae a implementación JS pura; verificado que el paquete carga y
+      funciona correctamente.
+- [x] Tests (Vitest): 28 nuevos — 5 de `computeOperationHash` (determinismo, diferencia ante
+      cambio de cualquier elemento de la tupla); 6 de `confirmOperation` (aprobación, un solo uso,
+      operación distinta no bloqueada por aprobación previa, rechazo, timeout, comando/host reales
+      mostrados al canal); 5 de `resolveCommandTemplate` (sustitución tipada, parámetro faltante,
+      parámetro inesperado, **2 tests explícitos de no-inyección** con metacaracteres de shell y
+      backticks/sustitución de comandos, verificando que nunca se interpretan como sintaxis de
+      shell); 8 de `execute` (los 3 verdicts de Policy Engine, host desconocido, plantilla
+      faltante, parámetros no válidos — todos con SSH mockeado, nunca contra host real); 4 de
+      `truncateOutput`.
+- [x] Alcance respetado: **ningún sistema remoto real (Debian de casa, VPS Contabo) fue tocado en
+      ningún momento** — verificado explícitamente por grep (sin referencias a hosts reales del
+      proyecto) y porque todos los tests de SSH usan mocks. No se implementó Audit Log
+      persistente, Sessions, ni adaptador MCP real. No se reabrió DEC-003, DEC-006, DEC-029,
+      DEC-031 ni DEC-036.
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 4 paquetes (tras corregir un error de
+      `exactOptionalPropertyTypes` en la construcción del objeto de conexión SSH — tipado, no
+      lógica); `pnpm run lint` sin errores; `pnpm run format` correcto (tras `--write` sobre 7
+      ficheros nuevos); `pnpm run test` — 96/98 tests correctos (2 tests de permisos POSIX
+      omitidos correctamente en Windows, mismos ya existentes de Fase 6) (28 nuevos + 68 previos),
+      tras corregir un fallo de aislamiento entre tests (mock no reseteado entre casos, no un
+      fallo de la lógica de negocio); `pnpm run build` correcto en los 4 paquetes; `pnpm install
+      --frozen-lockfile` correcto; grep de secretos hardcodeados sin coincidencias (salvo una
+      clave SSH ficticia explícitamente marcada como dato de test); grep de `console.*` en todo
+      `packages/execution-ssh` sin coincidencias reales (cero logging, coherente con DEC-040);
+      `dist/`/`node_modules/`/`*.tsbuildinfo` correctamente ignorados; `git diff` confirma que
+      Registry, Discovery, Policy Engine y Secrets Broker no fueron tocados.
+- [x] **Revisión de seguridad final** (2026-09-17, a petición explícita del usuario, antes de
+      autorizar commit): encontrado y corregido un fallo real de implementación — `client.ts`
+      construía el comando SSH remoto con `argv.join(" ")`, reconstruyendo una cadena de shell a
+      partir del array ya resuelto por `resolveCommandTemplate`; como `ssh2.exec()` envía esa
+      cadena al shell del servidor remoto (no hay modo "argv literal" en el protocolo SSH
+      `exec`), un valor de parámetro con metacaracteres de shell (`;`, `&&`, backticks, `$()`)
+      habría vuelto a interpretarse en el host remoto, violando DEC-037 pese a que
+      `resolveCommandTemplate` funcionaba correctamente en memoria. No detectado antes porque
+      `execute.test.ts` mockea `executeOverSsh` por completo. **Corrección** (dentro de DEC-037,
+      sin modificar ninguna decisión aprobada): nuevo módulo
+      `packages/execution-ssh/src/ssh/shell-quote.ts` (`quoteShellArg`/`buildShellCommand`, citado
+      POSIX de cada elemento argv antes de unir), usado en `client.ts` en vez de `argv.join(" ")`.
+      7 tests nuevos en `shell-quote.test.ts`, incluyendo verificación contra un
+      "unquoter" POSIX independiente que confirma que el valor original se recupera exacto tras
+      citar y des-citar, sin fuga de metacarácter. Además, se envolvió la llamada a
+      `confirmOperation` en `execute.ts` en un `try/catch` fail-closed (un fallo del propio
+      `ConfirmationChannel` ahora produce `confirmation-required-but-missing`, nunca una excepción
+      no estructurada que pudiera dejar el resultado en estado ambiguo). Resto de los 10 puntos
+      solicitados verificados correctos sin cambios: validación de parámetros antes del hash de
+      confirmación; host/comando siempre derivados de la configuración propia de Execution; hash
+      vinculado exactamente a identity+parámetros+host+schemaFingerprint; un solo uso; deny→ni
+      Secrets Broker ni SSH; requires-confirmation→confirma antes de tocar SSH; timeout de SSH
+      cierra la conexión con `conn.destroy()`; credenciales nunca aparecen en ningún `reason` de
+      `ExecutionOutcome` ni en mensajes de error propagados. Re-verificado tras la corrección:
+      typecheck/lint/format/test (103/105, 2 skip POSIX)/build/`--frozen-lockfile`, todos
+      correctos. `git diff`/`git status` revisados de nuevo: sin referencias a hosts reales del
+      proyecto, ningún test abre conexión SSH real.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -481,6 +582,13 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-035** — Ubicación: `packages/secrets-broker/src/` (confirmación de DEC-008/DEC-004).
 - **DEC-036** — Sin evidencia criptográfica de autorización Policy Engine↔Secrets Broker; límite
   de seguridad documentado explícitamente.
+- **DEC-037** — Comandos: plantilla fija por tool, nunca shell arbitraria.
+- **DEC-038** — Confirmación humana propia de Execution: hash determinista, un solo uso, timeout,
+  rechazo por defecto — hooks de Claude Code descartados tras verificación técnica.
+- **DEC-039** — Configuración de hosts remotos en JSON propio.
+- **DEC-040** — Límites de stdout/stderr, nunca logueados en claro.
+- **DEC-041** — Timeout de conexión SSH, cierre forzado al expirar.
+- **DEC-042** — Ubicación: `packages/execution-ssh`, paquete propio.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -572,33 +680,38 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `2411dc3274833cee0b908e7c76787fbd47b03b91` (corto: `2411dc3`)
+- Hash: `b48670d480721f0bf6ea97efac74a4b54311d093` (corto: `b48670d`)
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `feat+docs: implementa el Policy Engine — Fase 5 (DEC-023 a DEC-029)`
-- Contenido: 19 archivos, 804 inserciones/53 eliminaciones — modelo `RiskLevel`/`PolicyDecision`
-  en `packages/shared/src/policy/`; `PolicyConfig`/`PolicyApprovalStore`/`evaluate` en
-  `packages/core/src/policy/` con 17 tests nuevos (39 en total); `DEVELOPMENT.md`, `ROADMAP.md`,
-  `STATE.md`, `architecture/ARCHITECTURE.md`/`.en.md`, `decisions/DECISIONS.md` (actualizados con
-  DEC-023 a DEC-029).
-- Commits anteriores: `624581e` (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2), `2922629`
-  (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
+- Mensaje: `feat+docs: implementa el Secrets Broker — Fase 6 (DEC-030 a DEC-036)`
+- Contenido: 22 archivos, 1.103 inserciones/47 eliminaciones — modelo
+  `SecretId`/`SecretRecord`/API de operaciones en `packages/shared/src/secrets/`;
+  cifrado/clave-maestra/store/manejador de operaciones en `packages/secrets-broker/src/` con 29
+  tests nuevos (68 en total); `DEVELOPMENT.md`, `ROADMAP.md`, `STATE.md`,
+  `architecture/ARCHITECTURE.md`/`.en.md`, `decisions/DECISIONS.md` (actualizados con DEC-030 a
+  DEC-036).
+- Commits anteriores: `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053` (Fase 3), `4e01064`
+  (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
 
 ## Estado del push
 
 - **Realizado** (2026-09-16, con autorización explícita del usuario). `master` sincronizado con
-  `origin/master` (`2411dc3`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
+  `origin/master` (`b48670d`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
   al mismo hash).
 
 ## Próxima acción recomendada
 
-1. Pedir autorización explícita para el commit+push de los cambios de la Fase 6 (DEC-030 a
-   DEC-036, implementación del Secrets Broker, documentación sincronizada).
+1. Pedir autorización explícita para el commit+push de los cambios de la Fase 7 (DEC-037 a
+   DEC-042, implementación de Execution SSH, documentación sincronizada). **Pendiente: el usuario
+   pidió explícitamente NO hacer commit ni push en este ciclo de EXECUTE/VERIFY** — requiere una
+   autorización separada posterior.
 2. Tras el commit/push, presentar únicamente el resumen de objetivos y decisiones a analizar de la
-   Fase 7 (Ejecución remota/SSH) — sin implementar nada de esa fase todavía.
+   Fase 8 (Integración MCP) — sin implementar nada de esa fase todavía.
 3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
    `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`; el transporte IPC real
-   (named pipe/Unix socket, DEC-010) sigue sin implementar, fuera de alcance de la Fase 6.
+   (named pipe/Unix socket, DEC-010) sigue sin implementar; el usuario de sistema dedicado en cada
+   host remoto (`ARCHITECTURE.md` §9 OPEN QUESTION) sigue sin resolver — no se puede implementar
+   sin tocar esos sistemas, prohibido hasta autorización explícita.
 
 ## Cómo reprender este trabajo
 

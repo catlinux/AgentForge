@@ -363,8 +363,22 @@ la corrección sobre el mecanismo de almacenamiento):**
 **DECISION (DEC-006):** claves ed25519 dedicadas por host (Debian de casa, VPS Contabo), sin
 agent forwarding, para la fase 1.
 
-**PROPOSAL sobre esta base** (desarrollado en `research/SSH-SECURITY-NOTES.md` y
-`architecture/ARCHITECTURE-DRAFT.md` §4, mantenido):
+**DECISIÓN (DEC-037 a DEC-042, Fase 7):** modelo de comandos, confirmación humana, configuración
+de hosts, límites de salida, timeout, y ubicación de Execution ya están decididos — ver
+`decisions/DECISIONS.md`. Resumen: comandos con **plantilla fija por tool** (nunca shell
+arbitraria, coherente con el catálogo híbrido con allowlist ya esbozado abajo); confirmación
+humana síncrona **propia de Execution** vinculada por hash determinista
+(identity+parámetros+host+schemaFingerprint), de un solo uso, timeout, rechazo por defecto —
+descartados explícitamente los hooks de Claude Code (`PreToolUse`) tras verificación técnica: no
+ofrecen pausa-y-reanudación con estado externo ni ninguna señal verificable de aprobación humana
+hacia procesos externos; configuración de hosts en JSON propio; stdout/stderr con límite de
+tamaño, nunca logueados en claro; timeout de conexión SSH con cierre forzado; Execution vive en
+`packages/execution-ssh`, paquete propio (patrón ya reservado por DEC-008). **Limitación
+documentada explícitamente:** el mecanismo de confirmación de DEC-038 requiere un operador con
+acceso interactivo directo al proceso Execution — no cubre despliegues sin sesión interactiva
+disponible, donde toda operación `requires-confirmation` se deniega por defecto.
+
+**PROPOSAL (contexto histórico, Fase 1 — ver DEC-037 a DEC-042 arriba para lo ya decidido):**
 
 - Catálogo híbrido de herramientas: un conjunto creciente de herramientas específicas con
   allowlist (`apache_status()`, `docker_restart(service)`, `disk_usage()`...) para operaciones
@@ -624,8 +638,9 @@ no una decisión de implementación ahora.
 fases posteriores o al implementar)
 1. Secuenciación exacta: ¿empezar con MCP propio y añadir hooks transversales después, o
    ambos desde el principio? (§1)
-2. Mecanismo de confirmación humana síncrona: ¿nativo de Claude Code o interfaz propia de
-   AgentForge? (§4)
+2. ~~Mecanismo de confirmación humana síncrona: ¿nativo de Claude Code o interfaz propia de
+   AgentForge? (§4)~~ — **resuelto en Fase 7, ver DEC-038**: interfaz propia de Execution — los
+   hooks de Claude Code fueron descartados tras verificación técnica explícita.
 3. ~~Formato de definición del Tool Registry y dónde vive (ficheros vs. almacenamiento propio)
    (§5)~~ — **resuelto en Fase 3, ver DEC-013, DEC-014, DEC-017** (modelo propio MCP-compatible en
    `packages/shared`; configuración declarativa + caché no autoritativa; módulo en

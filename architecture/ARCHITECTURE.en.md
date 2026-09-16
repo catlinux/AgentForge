@@ -356,8 +356,22 @@ including the correction on the storage mechanism):**
 **DECISION (DEC-006):** dedicated ed25519 keys per host (home Debian server, Contabo VPS), no
 agent forwarding, for phase 1.
 
-**PROPOSAL built on this** (developed in `research/SSH-SECURITY-NOTES.md` and
-`architecture/ARCHITECTURE-DRAFT.md` §4, kept):
+**DECISION (DEC-037 to DEC-042, Phase 7):** command model, human confirmation, host
+configuration, output limits, timeout, and Execution's location are already decided — see
+`decisions/DECISIONS.md`. Summary: commands via a **fixed template per tool** (never arbitrary
+shell, consistent with the hybrid allowlisted catalog sketched below); synchronous human
+confirmation **owned by Execution itself**, bound to a deterministic hash
+(identity+parameters+host+schemaFingerprint), single-use, with timeout and deny-by-default —
+Claude Code hooks (`PreToolUse`) were explicitly ruled out after technical verification: they
+offer no pause-and-resume with external state, nor any verifiable human-approval signal to
+external processes; host configuration in its own JSON file; stdout/stderr with a size limit,
+never logged in the clear; SSH connection timeout with forced close; Execution lives in
+`packages/execution-ssh`, its own package (pattern already reserved by DEC-008). **Explicitly
+documented limitation:** DEC-038's confirmation mechanism requires an operator with direct
+interactive access to the Execution process — it does not cover deployments without an available
+interactive session, where every `requires-confirmation` operation is denied by default.
+
+**PROPOSAL (historical context, Phase 1 — see DEC-037 to DEC-042 above for what is now decided):**
 
 - A hybrid tool catalog: a growing set of specific allowlisted tools (`apache_status()`,
   `docker_restart(service)`, `disk_usage()`...) for anticipated operations, plus a very restricted
@@ -609,7 +623,9 @@ implementation decision now.
 during implementation)
 1. Exact sequencing: start with own MCP and add cross-cutting hooks later, or both from the
    start? (§1)
-2. Synchronous human confirmation mechanism: native to Claude Code or AgentForge's own interface?
+2. ~~Synchronous human confirmation mechanism: native to Claude Code or AgentForge's own
+   interface?~~ — **resolved in Phase 7, see DEC-038**: Execution's own interface — Claude Code
+   hooks were ruled out after explicit technical verification.
    (§4)
 3. ~~Tool Registry definition format and where it lives (files vs. dedicated storage) (§5)~~ —
    **resolved in Phase 3, see DEC-013, DEC-014, DEC-017** (own MCP-compatible model in

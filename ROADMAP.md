@@ -17,7 +17,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 4 | Tool Discovery | **En curso** — 5 decisiones aprobadas (DEC-018 a DEC-022) |
 | 5 | Permission / Policy Engine | **En curso** — 7 decisiones aprobadas (DEC-023 a DEC-029, incluye DEC-023b) |
 | 6 | Secrets Broker | **En curso** — 7 decisiones aprobadas (DEC-030 a DEC-036) |
-| 7 | Ejecución remota / SSH | Propuesta, no iniciada |
+| 7 | Ejecución remota / SSH | **En curso** — 6 decisiones aprobadas (DEC-037 a DEC-042) |
 | 8 | Integración MCP | Propuesta, no iniciada |
 | 9 | Sessions | Propuesta, no iniciada |
 | 10 | Audit Log | Propuesta, no iniciada |
@@ -96,7 +96,15 @@ de ellas.
   explícitamente (Policy Engine comparte proceso con Core, DEC-029, así que no puede actuar como
   autoridad independiente frente a un Core comprometido).
 - **Fase 7 — Ejecución remota / SSH**: ejecutor SSH controlado y auditado hacia Debian de casa y
-  VPS Contabo (sin tocar esos sistemas hasta que esta fase esté explícitamente autorizada).
+  VPS Contabo (sin tocar esos sistemas hasta que esta fase esté explícitamente autorizada). 6
+  decisiones aprobadas (DEC-037 a DEC-042, ver `decisions/DECISIONS.md`): comandos parametrizados
+  con plantilla fija por tool (nunca shell arbitraria); confirmación humana síncrona propia de
+  Execution, vinculada por hash determinista (identity+parámetros+host+schemaFingerprint), de un
+  solo uso, con timeout y rechazo por defecto — los hooks de Claude Code fueron descartados tras
+  verificación técnica explícita (no ofrecen pausa-y-reanudación ni señal verificable de
+  confirmación humana); configuración de hosts en JSON propio; límites de stdout/stderr sin
+  loguear contenido; timeout de conexión SSH con cierre forzado; paquete propio
+  `packages/execution-ssh` (patrón ya reservado por DEC-008).
 - **Fase 8 — Integración MCP**: servidor(es) MCP propio(s) y/o hooks de Claude Code.
 - **Fase 9 — Sessions**: gestión de sesiones de agente (identidad + herramientas + estado).
 - **Fase 10 — Audit Log**: registro centralizado y consultable de todas las acciones.

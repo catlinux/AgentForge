@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/shared" },
     { "path": "packages/core" },
-    { "path": "packages/secrets-broker" }
+    { "path": "packages/secrets-broker" },
+    { "path": "packages/execution-ssh" }
   ]
 }

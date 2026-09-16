@@ -4,3 +4,4 @@ export * from "./registry/index.js";
 export * from "./discovery/index.js";
 export * from "./policy/index.js";
 export * from "./secrets/index.js";
+export * from "./execution/index.js";

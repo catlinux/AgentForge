@@ -721,6 +721,129 @@ Format per a cada decisió futura:
   distinto — una decisión arquitectónica mayor, explícitamente no propuesta ni decidida aquí, que
   quedaría para una futura fase de hardening (Fase 13) si se decide abordarla.
 
+## DEC-037 — Modelo de comandos de Execution (Fase 7)
+
+- Fecha: 2026-09-17
+- Contexto: había que decidir si Execution acepta un comando SSH arbitrario construido por el
+  agente/Core, o solo plantillas de comando predefinidas con parámetros tipados, dado que Core es
+  un componente potencialmente no confiable (DEC-003) y ninguna capa anterior (Registry/Discovery/
+  Policy Engine) inspecciona el *contenido* de un comando, solo la *identidad* de la tool.
+- Opciones consideradas: (A1) comando fijo con parámetros tipados definidos en el `inputSchema` de
+  Registry (DEC-013), sustituidos en una plantilla predefinida; (A2) cadena de comando arbitraria
+  validada solo por Policy Engine; (A3) comandos predefinidos con un parámetro de "argumentos
+  libres" poco restringido.
+- Decisión: **(A1)**. Cada tool SSH declara una plantilla de comando fija; Execution nunca
+  concatena texto libre del agente — solo sustituye valores ya validados en posiciones tipadas de
+  su propia plantilla.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: descarta la inyección de comandos como superficie de ataque directa. El Audit Log
+  (Fase 10) podrá registrar "se ejecutó la tool X con parámetros Y" de forma legible, no una
+  cadena opaca. Coherente con DEC-023b (una tool que permitiera comando arbitrario tendría que
+  clasificarse siempre `destructive`, señal de que el diseño estaría mal si es evitable).
+
+## DEC-038 — Confirmación humana síncrona para operaciones `requires-confirmation` (Fase 7)
+
+- Fecha: 2026-09-17
+- Contexto: la pregunta abierta desde Fase 1 (`ARCHITECTURE.md` §20 punto 2) sobre el mecanismo de
+  confirmación humana síncrona dejó de ser postergable en esta fase. Una primera propuesta (B2)
+  sugería usar los hooks `PreToolUse` de Claude Code como canal de confirmación. Verificación
+  técnica explícita contra la documentación oficial de Claude Code (`hooks-guide.md`, `hooks.md`,
+  `permissions.md`) determinó que PreToolUse es síncrono de un solo disparo, sin mecanismo de
+  pausa-y-reanudación con estado externo, y sin ningún token/señal verificable que Claude Code
+  entregue a un proceso externo para distinguir una confirmación humana genuina de un simple
+  `allow` — B2 fue descartada tras esta verificación.
+- Opciones consideradas: (B1) bloquear el proceso Core esperando respuesta; (B2) hooks de Claude
+  Code — **descartada tras verificación técnica**; (B3) interfaz de confirmación propia de
+  AgentForge, gestionada directamente por Execution, fuera del espacio de confianza de Core.
+- Decisión: **(B3)**. Execution implementa su propio mecanismo de confirmación síncrona, en su
+  propio proceso/paquete (DEC-042), con las siguientes garantías obligatorias:
+  1. La confirmación se vincula a un **hash determinista** de (`identity` + parámetros
+     canonicalizados + host + `schemaFingerprint`) — nunca a la tool en abstracto.
+  2. Es de **un solo uso**: no se persiste entre invocaciones (a diferencia de la aprobación de
+     Policy Engine en DEC-026, que sí persiste por diseño); no puede reutilizarse para una
+     operación con un hash distinto, incluida la misma tool con distintos parámetros/host.
+  3. Lo que se muestra al operador procede de la **configuración propia de Execution** (plantilla
+     de comando real de DEC-037, host real de DEC-039) — nunca una descripción de más alto nivel
+     suministrada por Core.
+  4. **Timeout** obligatorio con denegación por defecto; rechazo explícito distinguible de
+     expiración por timeout.
+  5. Ante cualquier ambigüedad, fallo, o ausencia de confirmación válida: **denegar**, nunca
+     proceder.
+  La lógica de seguridad (hash, un solo uso, timeout, rechazo por defecto) se implementa separada
+  del mecanismo concreto de interacción, detrás de una interfaz `ConfirmationChannel`, con
+  `ReadlineConfirmationChannel` como única implementación de esta fase — mismo patrón ya aplicado
+  en DEC-010 (transporte agnóstico) y DEC-013 (modelo de dominio agnóstico de MCP). Esta separación
+  es un detalle de implementación derivado del principio de diseño ya consistente del proyecto, no
+  una decisión arquitectónica adicional.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, tras verificación técnica explícita de
+  los hooks de Claude Code y un análisis adicional de las garantías de vinculación/no-reutilización
+  del mecanismo propio).
+- Consecuencias — **limitaciones aceptadas explícitamente**: requiere un operador con acceso
+  interactivo directo al proceso Execution en el momento de la operación; no proporciona aprobación
+  remota/asíncrona en esta fase — en su ausencia, toda operación `requires-confirmation` se deniega
+  por defecto (seguro, no necesariamente útil en despliegues sin sesión interactiva). **Limitación
+  heredada, no resuelta por esta decisión** (ya documentada en DEC-036): Execution no puede
+  verificar de forma criptográficamente independiente que el `PolicyDecision` recibido de Core es
+  genuino — mitigado parcialmente por mostrar siempre al operador el comando/host reales desde la
+  configuración propia de Execution, nunca una descripción que Core pudiera haber manipulado.
+
+## DEC-039 — Configuración declarativa de hosts remotos (Fase 7)
+
+- Fecha: 2026-09-17
+- Contexto: había que decidir dónde vive la configuración de qué hosts remotos existen y qué
+  usuario de conexión usa cada uno, aplicando el mismo principio de separación de responsabilidades
+  ya usado en DEC-014/DEC-019/DEC-028 (Registry/Discovery/Policy Engine, cada uno con su propio
+  fichero de configuración).
+- Opciones consideradas: (C1) fichero JSON propio; (C2) reutilizar alguna configuración ya
+  existente (Registry/Discovery/Policy).
+- Decisión: **(C1)**. Fichero JSON propio para la configuración de hosts remotos (host, usuario de
+  conexión, referencia al `SecretId` de la clave SSH correspondiente, DEC-031), separado de
+  Registry/Discovery/Policy.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: mantiene el patrón ya establecido de "un fichero de configuración por
+  responsabilidad" — sin excepción para Execution.
+
+## DEC-040 — Límites y no exposición de stdout/stderr (Fase 7)
+
+- Fecha: 2026-09-17
+- Contexto: un comando remoto podría, por error o por diseño malicioso del lado remoto, volcar
+  contenido sensible a stdout/stderr; sin control, eso se propagaría sin límite.
+- Opciones consideradas: (D1) capturar todo sin límite; (D2) límite de tamaño (truncar) y nunca
+  loguear el contenido capturado en ningún log propio de Execution, solo metadatos (exit code,
+  tamaño, duración).
+- Decisión: **(D2)**. Mismo principio ya aplicado en el Secrets Broker (DEC-030/§1: nunca loguear
+  valores).
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: acota el riesgo de fuga de datos sensibles a través de la salida de un comando
+  remoto, incluso si el propio comando o el host remoto se comportan de forma inesperada.
+
+## DEC-041 — Timeout y cancelación de conexión SSH (Fase 7)
+
+- Fecha: 2026-09-17
+- Contexto: sin timeout, un comando remoto colgado bloquearía Execution (y por extensión, la
+  operación que depende de él) indefinidamente.
+- Opciones consideradas: (E1) timeout configurable por tool/operación con cierre forzado de la
+  conexión SSH al expirar; (E2) sin timeout, espera indefinida.
+- Decisión: **(E1)**.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: riesgo operacional simple evitado; el timeout de confirmación (DEC-038, punto 4)
+  y el timeout de conexión SSH son mecanismos distintos, cada uno con su propio plazo configurable.
+
+## DEC-042 — Ubicación de Execution SSH en el monorepo (Fase 7)
+
+- Fecha: 2026-09-17
+- Contexto: a diferencia de Registry/Discovery/Policy Engine (DEC-017/DEC-022/DEC-029), DEC-008 ya
+  reservó explícitamente el patrón de nombre `packages/execution-<nombre>` para backends de
+  ejecución futuros, anticipando que podría haber varios (SSH ahora, quizá otros después).
+- Opciones consideradas: (F1) paquete propio `packages/execution-ssh`; (F2) módulo dentro de
+  `packages/core`.
+- Decisión: **(F1)**. Aplicación directa del patrón ya reservado por DEC-008 — no una pregunta
+  nueva de "paquete o módulo", a diferencia de las fases anteriores.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: coherente con "crecer por adición, no por reestructuración" (razón central de
+  DEC-008). Aísla la dependencia externa nueva (`ssh2`) fuera de `packages/core`, que no la
+  necesita directamente.
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -767,6 +890,12 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 - ~~Identidad de secretos y control de acceso (Fase 6)~~ → DEC-034.
 - ~~Ubicación del Secrets Broker en el monorepo (Fase 6)~~ → DEC-035.
 - ~~Evidencia de autorización entre Policy Engine y Secrets Broker (Fase 6)~~ → DEC-036.
+- ~~Modelo de comandos de Execution (Fase 7)~~ → DEC-037.
+- ~~Confirmación humana síncrona para operaciones requires-confirmation (Fase 7)~~ → DEC-038.
+- ~~Configuración declarativa de hosts remotos (Fase 7)~~ → DEC-039.
+- ~~Límites y no exposición de stdout/stderr (Fase 7)~~ → DEC-040.
+- ~~Timeout y cancelación de conexión SSH (Fase 7)~~ → DEC-041.
+- ~~Ubicación de Execution SSH en el monorepo (Fase 7)~~ → DEC-042.
 
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):

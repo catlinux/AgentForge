@@ -118,6 +118,23 @@ Broker — ver `decisions/DECISIONS.md`.
   comprometido obtenga secretos a través del flujo de autorización legítimo ya disponible
   (DEC-036).
 
+**DECIDIDO (DEC-037 a DEC-042, Fase 7, 2026-09-17):** modelo de comandos, confirmación humana,
+configuración de hosts, límites de salida, timeout SSH, y ubicación de Execution — ver
+`decisions/DECISIONS.md`.
+
+- **Comandos:** plantilla fija por tool con parámetros tipados — nunca shell arbitraria ni
+  argumentos libres (DEC-037).
+- **Confirmación humana:** propia de Execution (no delegada a hooks de Claude Code, descartados
+  tras verificación técnica), vinculada por hash determinista de
+  identity+parámetros+host+schemaFingerprint, de un solo uso, con timeout y rechazo por defecto.
+  Lógica de seguridad separada del mecanismo de interacción vía `ConfirmationChannel`, con
+  `ReadlineConfirmationChannel` como única implementación de esta fase (DEC-038).
+- **Configuración de hosts:** fichero JSON propio, separado de Registry/Discovery/Policy
+  (DEC-039).
+- **stdout/stderr:** límite de tamaño, nunca logueados en claro (DEC-040).
+- **Conexión SSH:** timeout configurable, cierre forzado al expirar (DEC-041).
+- **Ubicación:** `packages/execution-ssh`, paquete propio (DEC-042).
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando
