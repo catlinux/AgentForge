@@ -17,10 +17,14 @@ ha sido tocado, configurado ni conectado hasta la fecha**.
 
 ## Stack tecnológico
 
-**PENDIENTE DE DECISIÓN.** La Fase 0 investigó tecnologías relevantes (MCP, arquitectura de
-Claude Code/Agent SDK, patrones de ejecución SSH) pero no eligió un lenguaje ni framework concreto
-de implementación para AgentForge. Esa decisión corresponde a la Fase 1 (ver `ROADMAP.md`) y
-requiere autorización explícita del usuario.
+**DECIDIDO (DEC-007, Fase 1, 2026-09-16): TypeScript/Node.js**, como stack único para todo
+AgentForge (Core, servidores MCP propios, y el Secrets Broker como proceso separado en el mismo
+lenguaje — ver `decisions/DECISIONS.md` y el análisis completo en
+`architecture/TECH-STACK-ANALYSIS.md`).
+
+Detalles todavía pendientes (no bloqueantes, se resuelven en la Fase 2): framework HTTP concreto
+(Express/Fastify/otro), paquete de acceso a Windows Credential Manager, y empaquetado del Secrets
+Broker como proceso independiente.
 
 ## Cómo ejecutar el proyecto
 

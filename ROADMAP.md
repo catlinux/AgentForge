@@ -11,7 +11,7 @@ decisiones de arquitectura que todavía están abiertas.
 |---|---|---|
 | 0 | Investigación técnica | **Completada** |
 | 0.5 | Fundamentos del proyecto y gobernanza | **En curso** |
-| 1 | Arquitectura y decisiones tecnológicas | Propuesta, no iniciada |
+| 1 | Arquitectura y decisiones tecnológicas | **Completada** — 5 decisiones aprobadas (DEC-003 a DEC-007), base arquitectónica en `architecture/ARCHITECTURE.md` |
 | 2 | Arquitectura núcleo | Propuesta, no iniciada |
 | 3 | Tool Registry | Propuesta, no iniciada |
 | 4 | Tool Discovery | Propuesta, no iniciada |
@@ -39,13 +39,16 @@ Organización profesional del proyecto: documentación de gobernanza (README, CO
 DEVELOPMENT, SECURITY), estructura de idiomas, preparación para Git/GitHub. Sin implementación de
 software.
 
-## Fase 1 — Arquitectura y decisiones tecnológicas (propuesta)
+## Fase 1 — Arquitectura y decisiones tecnológicas (completada)
 
-Resolver las decisiones abiertas identificadas en `architecture/ARCHITECTURE-DRAFT.md` §9:
-relación con Claude Code (wrap CLI / Agent SDK / extensión in-place), modelo de amenaza del
-Secrets Broker, alcance MCP (Modern vs. Dual-era), necesidad o no de una CA SSH. Elegir stack
-tecnológico concreto. Todavía sin implementación de software funcional — es la fase donde
-`PROPUESTA` pasa a `DECISIÓN` para los puntos que el usuario apruebe.
+Las 5 preguntas arquitectónicas principales quedaron resueltas: DEC-003 (extensión in-place con
+Claude Code), DEC-004 (Secrets Broker como proceso separado), DEC-005 (MCP Modern-only), DEC-006
+(claves SSH dedicadas por host), y DEC-007 (stack tecnológico: TypeScript/Node.js). La base
+arquitectónica completa está en `architecture/ARCHITECTURE.md` (y su equivalente en inglés), con
+el análisis de stack en `architecture/TECH-STACK-ANALYSIS.md`. Quedan preguntas de detalle de
+implementación (framework HTTP concreto, formato del Tool Registry, mecanismo de IPC, etc.,
+listadas en `architecture/ARCHITECTURE.md` §20) deliberadamente pospuestas a la Fase 2, para no
+decidir de más en esta fase. Todavía sin implementación de software funcional.
 
 ## Fases 2–16 (propuesta provisional, sujeta a revisión tras la Fase 1)
 

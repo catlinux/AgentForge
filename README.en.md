@@ -84,9 +84,12 @@ AgentForge — gateway/broker layer (PROPOSAL)
 Local / remote systems (home Debian server, Contabo VPS, GitHub, Dropbox, external APIs)
 ```
 
-This diagram represents the current research direction, **not an approved architecture**. Full
-detail, with each piece justified (or discarded) individually, is in
-`architecture/ARCHITECTURE-DRAFT.md`.
+This diagram represents the current research direction, **not a fully approved architecture**
+(though it already includes 4 approved decisions — DEC-003 through DEC-006, see
+`decisions/DECISIONS.md`). Full Phase 1 detail, with each piece justified and classified as
+decision/proposal/open question, is in `architecture/ARCHITECTURE.en.md` (and its Spanish
+equivalent `architecture/ARCHITECTURE.md`). The original Phase 0 document,
+`architecture/ARCHITECTURE-DRAFT.md`, is kept as a historical reference.
 
 ## Core principles
 
@@ -123,11 +126,15 @@ best project" or to model AgentForge after any single one of them. See
 
 ## Next steps
 
-1. Resolve the open decisions from Phase 0 (see `architecture/ARCHITECTURE-DRAFT.md`, section 9,
-   and `decisions/DECISIONS.md`).
-2. Decide whether the project will use GitHub and under which account/repository (pending
-   explicit user confirmation).
-3. Phase 1 — Architecture and technology decisions (not started, requires explicit authorization).
+Phase 1 (architecture and technology decisions) is **complete**: 5 decisions approved (DEC-003
+through DEC-007 — relationship with Claude Code, Secrets Broker threat model, MCP scope, SSH
+architecture, and the TypeScript/Node.js technology stack). See `decisions/DECISIONS.md` and
+`architecture/ARCHITECTURE.en.md`.
+
+1. Phase 2 — Core architecture (proposed next phase, not started, requires explicit
+   authorization).
+2. Minor decisions still pending: project license, repository visibility, Phase 2 implementation
+   details (see `decisions/DECISIONS.md`, "PENDING" section).
 
 See `ROADMAP.md` for the full proposed plan.
 

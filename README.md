@@ -85,9 +85,12 @@ AgentForge — capa de gateway/broker (PROPUESTA)
 Sistemas locales / remotos (Debian de casa, VPS Contabo, GitHub, Dropbox, APIs externas)
 ```
 
-Este diagrama representa la dirección de investigación actual, **no una arquitectura aprobada**.
-El detalle completo, con cada pieza justificada (o descartada) individualmente, está en
-`architecture/ARCHITECTURE-DRAFT.md`.
+Este diagrama representa la dirección de investigación actual, **no una arquitectura aprobada en
+su totalidad** (aunque ya incluye 4 decisiones aprobadas — DEC-003 a DEC-006, ver
+`decisions/DECISIONS.md`). El detalle completo de la Fase 1, con cada pieza justificada y
+clasificada como decisión/propuesta/pregunta abierta, está en `architecture/ARCHITECTURE.md`
+(y su equivalente `architecture/ARCHITECTURE.en.md`). El documento original de la Fase 0,
+`architecture/ARCHITECTURE-DRAFT.md`, se conserva como referencia histórica.
 
 ## Principios principales
 
@@ -124,11 +127,15 @@ en particular. Ver `docs/es/research/RELATED-PROJECTS.md`.
 
 ## Próximos pasos
 
-1. Resolver las decisiones abiertas de la Fase 0 (ver `architecture/ARCHITECTURE-DRAFT.md`,
-   sección 9, y `decisions/DECISIONS.md`).
-2. Decidir si el proyecto usará GitHub y con qué cuenta/repositorio (pendiente de confirmación
-   explícita del usuario).
-3. Fase 1 — Arquitectura y decisiones tecnológicas (no iniciada, requiere autorización explícita).
+La Fase 1 (arquitectura y decisiones tecnológicas) está **completada**: 5 decisiones aprobadas
+(DEC-003 a DEC-007 — relación con Claude Code, modelo de amenaza del Secrets Broker, alcance MCP,
+arquitectura SSH, y stack tecnológico TypeScript/Node.js). Ver `decisions/DECISIONS.md` y
+`architecture/ARCHITECTURE.md`.
+
+1. Fase 2 — Arquitectura núcleo (siguiente fase propuesta, no iniciada, requiere autorización
+   explícita).
+2. Decisiones menores todavía pendientes: licencia del proyecto, visibilidad del repositorio,
+   detalles de implementación de la Fase 2 (ver `decisions/DECISIONS.md`, sección "PENDIENTE").
 
 Ver `ROADMAP.md` para la planificación completa propuesta.
 

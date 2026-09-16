@@ -1,5 +1,12 @@
 # ARCHITECTURE-DRAFT.md — AgentForge
 
+> **Nota (Fase 1, 2026-09-16):** este documento es el registro histórico de las propuestas de la
+> Fase 0. Cuatro de las preguntas abiertas de la sección 9 (relación con Claude Code, modelo de
+> amenaza del Secrets Broker, alcance MCP, arquitectura SSH) ya han sido decididas — ver DEC-003 a
+> DEC-006 en `decisions/DECISIONS.md` — y desarrolladas en detalle en
+> `architecture/ARCHITECTURE.md` (Fase 1, español/inglés). Este documento se conserva sin
+> modificar como referencia histórica; no reescribas su contenido.
+
 **Estat: PROPOSAL. Cap decisió d'aquest document ha estat aprovada per l'usuari.** Vegeu
 `decisions/DECISIONS.md` per a l'únic registre de decisions reals (actualment buit).
 

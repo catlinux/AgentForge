@@ -12,23 +12,28 @@ copiar).
 
 ## Fase actual
 
-**Fase 0.7 — Exploración de proyectos y funcionalidades relacionadas**
+**Fase 1 — Arquitectura y decisiones tecnológicas**
 
-**Estado:** COMPLETADA
+**Estado:** COMPLETADA (2026-09-16) — 5 decisiones aprobadas (DEC-003 a DEC-007); detalles menores
+de implementación (framework HTTP, paquete de Credential Manager, empaquetado del Secrets Broker)
+pospuestos deliberadamente a la Fase 2 por decisión explícita del usuario.
 
 **Implementación:** NO INICIADA
 
-**Investigación:** Fases 0 y 0.7 completadas (además de la Fase 0.5, de gobernanza, también
-completada)
+**Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
-**Arquitectura:** BORRADOR / PENDIENTE DE APROBACIÓN
+**Arquitectura:** BASE ARQUITECTÓNICA APROBADA (Fase 1) — 5 decisiones aprobadas (DEC-003 a
+DEC-007), resto documentado como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20,
+explícitamente pospuesto a la Fase 2. No es una arquitectura de implementación detallada — sigue
+siendo una base, no el diseño final de cada componente.
 
 ## Microtarea actual
 
-Ninguna en curso — la Fase 0.7 se ha completado y el trabajo se detiene aquí a la espera de
-instrucciones del usuario, tal como especifica el encargo de esta fase. No se ha hecho commit de
-los cambios de esta fase (instrucción explícita del encargo: ninguna autorización de investigación
-implica autorización de commit).
+Ninguna en curso. La Fase 1 se completó (DEC-003 a DEC-007), se hizo una comprobación de
+consistencia documental final (ver más abajo, incluye una limpieza de contenido duplicado
+heredado de la Fase 0.5 en `decisions/DECISIONS.md`), y se hizo commit+push (autorizado
+explícitamente). El siguiente paso es la Fase 2, todavía sin iniciar más allá de un resumen de
+objetivos — no se ha implementado nada.
 
 ## Trabajo completado
 
@@ -83,6 +88,57 @@ inexistentes) que fue detectada y descartada mediante verificación cruzada dire
 DNS, registro de PyPI) antes de incluirse en ningún documento. No se incluyó ningún perfil de
 GooSio — queda marcado como no verificable, sin inventar contenido.
 
+### Fase 1 — Arquitectura y decisiones tecnológicas (en curso, iniciada y avanzada 2026-09-16)
+- [x] Inspección del estado real del repositorio antes de trabajar (git log, listado de archivos)
+      — coincide con lo documentado, sin contradicciones detectadas.
+- [x] Evaluación de modelo/nivel de esfuerzo: adecuado para trabajo de síntesis arquitectónica, sin
+      cambio.
+- [x] Confirmadas con el usuario (vía AskUserQuestion) las 4 preguntas arquitectónicas que
+      condicionaban en cascada el resto del diseño, antes de escribir la arquitectura completa.
+- [x] **DEC-003** — Relación con Claude Code: extensión in-place (hooks + MCP propios).
+- [x] **DEC-004** — Secrets Broker: proceso separado, usuario de SO propio.
+- [x] **DEC-005** — Alcance MCP: Modern-only (espec `2026-07-28`).
+- [x] **DEC-006** — Ejecución remota: claves SSH ed25519 dedicadas por host, sin CA SSH en fase 1.
+- [x] `architecture/ARCHITECTURE.md` (español, principal) — base arquitectónica completa: 20
+      secciones cubriendo arquitectura general, componentes, fronteras de confianza, flujo,
+      Tool Registry, Tool Discovery, Policy Engine, Secrets, ejecución remota, MCP, sesiones,
+      auditoría, storage, APIs, dashboard, seguridad, extensibilidad/i18n, dependencias
+      tecnológicas, y qué implementa AgentForge vs. qué deja a Claude Code.
+- [x] `architecture/ARCHITECTURE.en.md` — equivalente en inglés.
+- [x] `architecture/ARCHITECTURE-DRAFT.md` — conservado sin reescribir, con una nota corta
+      apuntando al nuevo documento (no se ha eliminado ni modificado su contenido original).
+- [x] `decisions/DECISIONS.md` actualizado: DEC-003 a DEC-006 registradas; lista de PENDIENTE
+      reducida a solo licencia del proyecto e inconsistencia de idioma.
+- [x] `ROADMAP.md` y `README.md`/`README.en.md` actualizados con referencias cruzadas al nuevo
+      documento de arquitectura.
+- [x] **Stack tecnológico concreto** — `architecture/TECH-STACK-ANALYSIS.md` creado con análisis
+      de TypeScript/Node.js, Python, Go, Rust y C#/.NET; **DEC-007 aprobada: TypeScript/Node.js**
+      como stack único. `architecture/ARCHITECTURE.md`/`.en.md` §17 y `DEVELOPMENT.md`
+      actualizados en consecuencia.
+- [ ] Commit y push de los cambios de esta fase (incluye el stack tecnológico) — **pendiente de
+      autorización explícita del usuario**.
+- [x] Traducción al inglés de `architecture/TECH-STACK-ANALYSIS.md` — **pospuesta a propósito**
+      por decisión explícita del usuario (2026-09-16), hasta que la documentación esté más
+      estable. Registrado en `decisions/DECISIONS.md`, sección "PENDIENTE".
+- [x] **Comprobación de consistencia final** antes de cerrar la fase (2026-09-16): revisadas
+      `decisions/DECISIONS.md`, `architecture/ARCHITECTURE.md`, `STATE.md`, `ROADMAP.md`,
+      `DEVELOPMENT.md`, `README.md`/`.en.md`. Se encontraron y corrigieron 3 inconsistencias:
+      (1) `decisions/DECISIONS.md` tenía contenido duplicado heredado de la Fase 0.5 — los puntos
+      "Uso de GitHub" e "Identidad Git" aparecían tachados como resueltos arriba pero repetidos
+      íntegros más abajo sin tachar; limpiado en una única lista clara de pendientes reales;
+      (2) `ROADMAP.md` seguía marcando el stack tecnológico como pendiente después de aprobarse
+      DEC-007; corregido; (3) las secciones "Próximos pasos"/"Next steps" de
+      `README.md`/`README.en.md` seguían describiendo la Fase 1 como "no iniciada"; actualizadas
+      para reflejar su cierre y apuntar a la Fase 2. Verificado también: ningún secreto/credencial
+      ni código funcional introducido (`grep` sobre todos los ficheros modificados/nuevos).
+
+**Verificado antes de cerrar este bloque:** ningún componente funcional implementado (backend,
+MCP server real, connectors, secrets broker, SSH executor, dashboard); AgentForge no se describe
+en ningún documento como alternativa/sustituto/fork/evolución de Composio ni de ningún otro
+proyecto estudiado; toda idea de investigación (Fase 0 y 0.7) que se cita en
+`architecture/ARCHITECTURE.md` se marca explícitamente como PROPOSAL o inspiración, nunca como
+decisión automática.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -106,28 +162,42 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
   explícitamente — no asumida.
 - **DEC-002** — Identidad Git local (no global) para este repositorio: nombre `catlinux`, email
   `marc.catlinux@gmail.com`. Credenciales de acceso ya guardadas en el equipo según el usuario.
+- **DEC-003** — Relación con Claude Code: extensión in-place (hooks + MCP propios), no wrap de CLI
+  ni Agent SDK como producto separado.
+- **DEC-004** — Secrets Broker: proceso separado del agente, con usuario y permisos propios del
+  sistema operativo.
+- **DEC-005** — Alcance MCP: Modern-only (especificación `2026-07-28`), sin soporte Dual-era.
+- **DEC-006** — Ejecución remota: claves SSH ed25519 dedicadas por host (Debian casa, Contabo),
+  sin CA SSH en la fase 1.
+- **DEC-007** — Stack tecnológico: TypeScript/Node.js como stack único para todo AgentForge.
 
-Ver `decisions/DECISIONS.md` para el detalle completo.
+Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
 ## Propuestas (no decisiones)
 
-Toda la arquitectura de `architecture/ARCHITECTURE-DRAFT.md` sigue siendo propuesta. Ver ese
-documento, sección 9, para las 4 preguntas arquitectónicas abiertas.
+La mayor parte de `architecture/ARCHITECTURE.md` sigue siendo PROPOSAL (marcado explícitamente
+sección por sección). 5 decisiones están aprobadas (DEC-003 a DEC-007); todo lo demás (diseño del
+Tool Registry, formato del Audit Log, lenguaje de reglas del Policy Engine, mecanismo de IPC,
+framework HTTP concreto, etc.) sigue abierto. Ver `architecture/ARCHITECTURE.md` §20 para el
+listado completo de preguntas abiertas.
 
 ## Decisiones pendientes
 
 Lista completa y actualizada en `decisions/DECISIONS.md` (sección "PENDIENTE"). Resumen:
-1. Relación con Claude Code (wrap CLI / Agent SDK / extensión in-place).
-2. Modelo de amenaza del Secrets Broker.
-3. Estrategia MCP (Modern-only vs. Dual-era).
-4. Arquitectura de ejecución remota (claves por host vs. CA SSH).
-5. Licencia del proyecto.
+1. ~~Relación con Claude Code~~ — **resuelto, ver DEC-003**.
+2. ~~Modelo de amenaza del Secrets Broker~~ — **resuelto, ver DEC-004**.
+3. ~~Estrategia MCP~~ — **resuelto, ver DEC-005**.
+4. ~~Arquitectura de ejecución remota (fase 1)~~ — **resuelto, ver DEC-006**.
+5. Licencia del proyecto — todavía sin elegir.
 6. ~~Uso de GitHub~~ — **resuelto, ver DEC-001**.
 7. ~~Identidad Git~~ — **resuelto, ver DEC-002**.
 8. Qué hacer con la inconsistencia de idioma Fase 0 (catalán) vs. resto del proyecto
    (español/inglés).
 9. Visibilidad del repositorio `catlinux/AgentForge` (público/privado) — no confirmada
    explícitamente por el usuario, no asumida.
+10. ~~Stack tecnológico concreto~~ — **resuelto, ver DEC-007**. Quedan detalles menores
+    (framework HTTP, paquete de Credential Manager, empaquetado del Secrets Broker) pospuestos a
+    la Fase 2.
 
 ## Bloqueadores
 
@@ -191,16 +261,19 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `c671bef`
+- Hash: `d83da17`
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `docs: establece la base y gobernanza inicial de AgentForge`
-- Contenido: 18 archivos, 2.768 inserciones — toda la documentación de Fase 0 (investigación,
-  catalán) y Fase 0.5 (gobernanza, español/inglés). Ningún archivo de código.
+- Mensaje: `docs: añade exploración ligera de proyectos relacionados (Fase 0.7)`
+- Contenido: 5 archivos, 1.615 inserciones/23 eliminaciones — `docs/es/research/RELATED-PROJECTS.md`
+  y `docs/en/research/RELATED-PROJECTS.md` (nuevos), `README.md`/`README.en.md` (referencia
+  cruzada añadida), `STATE.md` (cierre de Fase 0.7). Ningún archivo de código.
+- Commit anterior: `c671bef` — `docs: establece la base y gobernanza inicial de AgentForge` (Fase
+  0 + Fase 0.5, 18 archivos, 2.768 inserciones).
 
 ## Estado del push
 
-- **Realizado** (2026-09-16, con autorización explícita del usuario). `master` → `origin/master`,
-  rama nueva creada en el remoto, tracking configurado.
+- **Realizado** (2026-09-16, con autorización explícita del usuario, para ambos commits). `master`
+  sincronizado con `origin/master` (`d83da17`), working tree limpio.
 
 ## Próxima acción recomendada
 
