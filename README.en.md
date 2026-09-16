@@ -115,6 +115,12 @@ they solve and what they don't), and remote execution/SSH and security patterns 
 
 See `docs/research/RESEARCH-REPORT.md` for the full synthesis of findings.
 
+Additionally, Phase 0.7 carried out a light exploration of other projects related to the
+AI-agent-tooling ecosystem (Nango, Arcade, Windmill, IBM ContextForge, MCPX, Activepieces, and
+more briefly Pipedream and Smithery), to identify further ideas and patterns — not to pick "the
+best project" or to model AgentForge after any single one of them. See
+`docs/en/research/RELATED-PROJECTS.md`.
+
 ## Next steps
 
 1. Resolve the open decisions from Phase 0 (see `architecture/ARCHITECTURE-DRAFT.md`, section 9,

@@ -116,6 +116,12 @@ y VS Code (qué resuelve y qué no), y patrones de ejecución remota/SSH y segur
 
 Ver `docs/research/RESEARCH-REPORT.md` para la síntesis completa de conclusiones.
 
+Adicionalmente, en la Fase 0.7 se hizo una exploración ligera de otros proyectos relacionados con
+el ecosistema de herramientas para agentes de IA (Nango, Arcade, Windmill, IBM ContextForge, MCPX,
+Activepieces, y de forma más breve Pipedream y Smithery), para identificar ideas y patrones
+adicionales — no para elegir "el mejor proyecto" ni para modelar AgentForge sobre ninguno de ellos
+en particular. Ver `docs/es/research/RELATED-PROJECTS.md`.
+
 ## Próximos pasos
 
 1. Resolver las decisiones abiertas de la Fase 0 (ver `architecture/ARCHITECTURE-DRAFT.md`,

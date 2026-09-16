@@ -12,20 +12,23 @@ copiar).
 
 ## Fase actual
 
-**Fase 0.5 — Fundamentos del proyecto y gobernanza**
+**Fase 0.7 — Exploración de proyectos y funcionalidades relacionadas**
 
 **Estado:** COMPLETADA
 
-**Implementación de software:** NO INICIADA
+**Implementación:** NO INICIADA
 
-**Investigación:** COMPLETADA (Fase 0)
+**Investigación:** Fases 0 y 0.7 completadas (además de la Fase 0.5, de gobernanza, también
+completada)
 
 **Arquitectura:** BORRADOR / PENDIENTE DE APROBACIÓN
 
 ## Microtarea actual
 
-Ninguna en curso — la Fase 0.5 se ha completado y el trabajo se detiene aquí a la espera de
-instrucciones del usuario, tal como especifica el encargo de esta fase.
+Ninguna en curso — la Fase 0.7 se ha completado y el trabajo se detiene aquí a la espera de
+instrucciones del usuario, tal como especifica el encargo de esta fase. No se ha hecho commit de
+los cambios de esta fase (instrucción explícita del encargo: ninguna autorización de investigación
+implica autorización de commit).
 
 ## Trabajo completado
 
@@ -57,6 +60,28 @@ instrucciones del usuario, tal como especifica el encargo de esta fase.
 - [x] `LICENSE` — **NO creado deliberadamente**: no se ha inventado ninguna licencia; queda
       documentado como PENDIENTE DE DECISIÓN en `DEVELOPMENT.md`, `README.md` y
       `decisions/DECISIONS.md`.
+
+### Fase 0.7 — Exploración de proyectos y funcionalidades relacionadas (completada, 2026-09-16)
+- [x] Investigación ligera de 9 proyectos: Nango, Arcade, Windmill, IBM ContextForge, MCPX
+      (Lunar.dev), Activepieces, GooSio (no verificable como proyecto real), Pipedream, Smithery.
+- [x] `docs/es/research/RELATED-PROJECTS.md` — perfiles completos de los 7 proyectos principales,
+      perfiles breves de Pipedream/Smithery, nota explícita sobre GooSio, matriz consolidada de
+      funcionalidades, ideas candidatas agrupadas por área, notas de licencias.
+- [x] `docs/en/research/RELATED-PROJECTS.md` — equivalente en inglés, mismo contenido.
+- [x] Corrección documental menor: añadida una referencia cruzada breve en `README.md`/
+      `README.en.md` apuntando al nuevo documento (no se ha modificado ni reescrito ninguna otra
+      parte de la Fase 0 ni de la Fase 0.5).
+- [x] Ninguna idea de esta fase se ha convertido en decisión — todas quedan explícitamente como
+      candidatas pendientes de evaluación en la Fase 1.
+- [x] Verificado: ningún código copiado de los proyectos estudiados; ninguna afirmación de
+      funcionalidad de AgentForge que no exista; AgentForge no se presenta en ningún documento
+      como alternativa/sustituto/evolución de Composio ni de ningún otro proyecto estudiado.
+
+**Hallazgo metodológico relevante:** durante la investigación de "GooSio", las herramientas de
+búsqueda/fetch generaron inicialmente información fabricada (dominio, paquete PyPI y repositorio
+inexistentes) que fue detectada y descartada mediante verificación cruzada directa (API de GitHub,
+DNS, registro de PyPI) antes de incluirse en ningún documento. No se incluyó ningún perfil de
+GooSio — queda marcado como no verificable, sin inventar contenido.
 
 ## Documentación sincronizada
 
@@ -147,36 +172,43 @@ ni eliminado en esta fase.
 
 ## Estado Git
 
-- Repositorio: **no inicializado**.
-- Identidad global de la máquina: `warcrafted-server <warcrafted.server@gmail.com>` — no tocada,
-  probablemente no corresponde a este proyecto (pendiente de decisión, ver arriba).
-- Ningún commit realizado.
+- Repositorio: **inicializado** (`git init` ejecutado 2026-09-16, con autorización explícita del
+  usuario).
+- Identidad **local** del repositorio (no global, DEC-002): `catlinux <marc.catlinux@gmail.com>`.
+- Identidad global de la máquina: `warcrafted-server <warcrafted.server@gmail.com>` — sigue sin
+  tocarse; no afecta a este repositorio gracias a la identidad local configurada.
+- Rama actual: `master`, sincronizada con `origin/master` (`up to date`, working tree clean).
+- SSH verificado de forma no destructiva antes de cualquier cambio: alias `github-catlinux` →
+  clave `~/.ssh/id_ed25519_catlinux`, autenticación confirmada como cuenta `catlinux`.
 
 ## Estado GitHub
 
-- Repositorio remoto ya creado por el usuario: `https://github.com/catlinux/AgentForge` (DEC-001).
-- Todavía no configurado como `origin` en local (no hay repositorio Git local todavía).
-- Visibilidad (público/privado) no confirmada explícitamente.
-- Sin ningún push realizado.
+- Repositorio remoto: `https://github.com/catlinux/AgentForge` (DEC-001), accedido vía SSH con el
+  alias `github-catlinux` → `git@github-catlinux:catlinux/AgentForge.git`.
+- Remote `origin` configurado y funcionando; rama `master` publicada y en tracking
+  (`branch 'master' set up to track 'origin/master'`).
+- Visibilidad (público/privado) todavía no confirmada explícitamente por el usuario — no asumida.
 
 ## Último commit
 
-Ninguno — no hay repositorio Git inicializado todavía.
+- Hash: `c671bef`
+- Autor: `catlinux <marc.catlinux@gmail.com>`
+- Mensaje: `docs: establece la base y gobernanza inicial de AgentForge`
+- Contenido: 18 archivos, 2.768 inserciones — toda la documentación de Fase 0 (investigación,
+  catalán) y Fase 0.5 (gobernanza, español/inglés). Ningún archivo de código.
 
 ## Estado del push
 
-No aplica — no hay commit ni repositorio Git local todavía.
+- **Realizado** (2026-09-16, con autorización explícita del usuario). `master` → `origin/master`,
+  rama nueva creada en el remoto, tracking configurado.
 
 ## Próxima acción recomendada
 
-1. Pedir autorización explícita para `git init` + configurar identidad local (DEC-002) + añadir
-   remoto `origin` → `https://github.com/catlinux/AgentForge`.
-2. Mostrar el `git status`/`git diff` completo y el mensaje de commit propuesto, y pedir
-   autorización explícita **antes** de ejecutar el commit.
-3. Pedir autorización **por separado** para el push.
-4. Resolver las decisiones pendientes restantes (1–5, 8, 9 de la lista de arriba) antes o durante
-   la Fase 1.
-5. **Siguiente fase propuesta: Fase 1 — Arquitectura y decisiones tecnológicas.** No se inicia
+1. Confirmar visibilidad del repositorio `catlinux/AgentForge` (pública/privada) si es relevante.
+2. Resolver las decisiones pendientes restantes (relación con Claude Code, modelo de amenaza del
+   Secrets Broker, estrategia MCP, arquitectura de ejecución remota, licencia del proyecto,
+   inconsistencia de idioma Fase 0) antes o durante la Fase 1.
+3. **Siguiente fase propuesta: Fase 1 — Arquitectura y decisiones tecnológicas.** No se inicia
    sin autorización explícita del usuario.
 
 ## Cómo reprender este trabajo
