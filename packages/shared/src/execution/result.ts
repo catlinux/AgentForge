@@ -22,6 +22,14 @@ export type ExecutionOutcome =
       readonly stdoutBytes: number;
       readonly stderrBytes: number;
     }
+  /**
+   * Result of an HTTP-based Execution Backend (Fase 11, DEC-060) — e.g. a connector calling a
+   * third-party REST API. Deliberately a separate variant from "executed" rather than forcing an
+   * HTTP response into SSH-shaped fields (no exit code, no stdout/stderr): `statusCode` is the
+   * HTTP response status, `responseBytes` is the response body's byte length. Same minimization
+   * principle as "executed": the response body content is never carried by this type (DEC-055).
+   */
+  | { readonly kind: "executed-http"; readonly statusCode: number; readonly responseBytes: number }
   | { readonly kind: "denied"; readonly reason: string }
   | { readonly kind: "confirmation-required-but-missing"; readonly reason: string }
   | { readonly kind: "timed-out" }

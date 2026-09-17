@@ -59,6 +59,7 @@ export interface ExecutionCompletedEvent extends AuditEventBase {
   readonly identity: ToolIdentity | undefined;
   readonly outcomeKind:
     | "executed"
+    | "executed-http"
     | "denied"
     | "confirmation-required-but-missing"
     | "timed-out"
@@ -72,6 +73,10 @@ export interface ExecutionCompletedEvent extends AuditEventBase {
    * "executed"`, never the stdout/stderr content itself. */
   readonly stdoutBytes: number | undefined;
   readonly stderrBytes: number | undefined;
+  /** HTTP status code and response body byte length (Fase 11, DEC-060) — only known when
+   * `outcomeKind === "executed-http"`, never the response body content itself. */
+  readonly statusCode: number | undefined;
+  readonly responseBytes: number | undefined;
 }
 
 export type CancellationPhase = "before-execution" | "during-confirmation" | "after-authorization";

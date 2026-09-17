@@ -18,7 +18,12 @@ export interface ToolsCallDeps {
   /** Resolves the MCP tool name (Discovery's `qualifiedName`) back to its Registry entry. */
   readonly resolveToolEntry: (mcpToolName: string) => Promise<ToolEntry | undefined>;
   readonly evaluate: (entry: ToolEntry) => Promise<PolicyDecision>;
-  readonly executionClient: ExecutionChannelClient;
+  /** Selects which Execution Backend process handles this tool, by `ToolEntry.origin.id` (Fase
+   * 11, DEC-058: one `ExecutionChannelClient` per backend — e.g. "execution-ssh",
+   * "connector-github" — never a single fixed client). Returns `undefined` if no backend is
+   * configured for that origin, treated identically to a failed IPC connection (fail-closed,
+   * DEC-047) — never a silent pass-through. */
+  readonly resolveExecutionClient: (originId: string) => ExecutionChannelClient | undefined;
   /** Emits a progress notification to keep the MCP client's timeout window open (DEC-045). */
   readonly sendProgress: () => void;
   /** Resolves when the MCP client sends `notifications/cancelled` for this call (DEC-045). */
@@ -81,10 +86,13 @@ export async function handleToolCall(
       outputTruncated: undefined,
       stdoutBytes: undefined,
       stderrBytes: undefined,
+      statusCode: undefined,
+      responseBytes: undefined,
     });
     return { isError: true, content: "Unknown tool" };
   }
   const identity = entry.identity;
+  const executionClient = deps.resolveExecutionClient(entry.origin.id);
 
   const decision = await deps.evaluate(entry);
   void deps.auditWriter?.write({
@@ -97,10 +105,33 @@ export async function handleToolCall(
     baseRisk: decision.baseRisk,
   });
 
+  // Fail closed if no Execution Backend is configured for this tool's origin (Fase 11, DEC-058)
+  // — never a silent pass-through, same treatment as a failed IPC connection below.
+  if (executionClient === undefined) {
+    void deps.auditWriter?.write({
+      type: "execution-completed",
+      operationId,
+      sessionId,
+      identity,
+      outcomeKind: "execution-unavailable",
+      exitCode: undefined,
+      reason: `No Execution Backend configured for origin "${entry.origin.id}"`,
+      outputTruncated: undefined,
+      stdoutBytes: undefined,
+      stderrBytes: undefined,
+      statusCode: undefined,
+      responseBytes: undefined,
+    });
+    return {
+      isError: true,
+      content: `No Execution Backend configured for origin "${entry.origin.id}"`,
+    };
+  }
+
   // Checked before issuing the request at all: if the call was already cancelled by the time
   // policy evaluation finished, never even contact Execution (DEC-045).
   if (deps.cancelled.aborted) {
-    await deps.executionClient.cancel(
+    await executionClient.cancel(
       identity,
       hostId,
       args,
@@ -128,7 +159,7 @@ export async function handleToolCall(
       operationId,
     };
 
-    const requestPromise = deps.executionClient.request(channelRequest);
+    const requestPromise = executionClient.request(channelRequest);
     const cancellation = new Promise<"cancelled">((resolve) => {
       deps.cancelled.addEventListener("abort", () => resolve("cancelled"), { once: true });
     });
@@ -143,7 +174,7 @@ export async function handleToolCall(
       // view — from the MCP server's own perspective it only knows "the client cancelled while
       // I was waiting for Execution's response", so a single phase is accurate here; Execution's
       // own confirmation-resolved/execution-completed events carry the more precise distinction.
-      await deps.executionClient.cancel(
+      await executionClient.cancel(
         identity,
         hostId,
         args,
@@ -176,12 +207,20 @@ export async function handleToolCall(
         outputTruncated: undefined,
         stdoutBytes: undefined,
         stderrBytes: undefined,
+        statusCode: undefined,
+        responseBytes: undefined,
       });
       return { isError: true, content: response.reason };
     }
     if (response.outcome.kind === "executed") {
       return {
         isError: response.outcome.exitCode !== 0,
+        content: JSON.stringify(response.outcome),
+      };
+    }
+    if (response.outcome.kind === "executed-http") {
+      return {
+        isError: response.outcome.statusCode >= 400,
         content: JSON.stringify(response.outcome),
       };
     }

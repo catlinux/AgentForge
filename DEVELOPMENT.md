@@ -183,6 +183,31 @@ garantías del Audit Log — ver `decisions/DECISIONS.md`.
   Policy Engine/`OperationHashRegistry`/ejecución (DEC-056).
 - **Garantías:** best effort, nunca bloqueante ni condicionante de la operación real (DEC-057).
 
+**DECIDIDO (DEC-058 a DEC-063, Fase 11, 2026-09-17):** modelo general, reutilización de contrato,
+forma del resultado, autenticación, alcance funcional, y dependencia HTTP de Connectors — ver
+`decisions/DECISIONS.md`.
+
+- **Modelo general:** paquete propio por conector (`packages/connector-github`), mismo patrón de
+  proceso Execution separado que `execution-ssh` (DEC-042/047) — nunca un macropaquete compartido
+  entre conectores (DEC-058).
+- **Contrato:** reutiliza `ExecutionRequest`/`ExecutionOutcome`/`ExecutionChannelRequest` tal cual
+  (`hostId` reinterpretado como identificador de cuenta, ya opaco en su tipo) — el servidor MCP
+  enruta entre procesos Execution Backend por `ToolEntry.origin.id`, sin dejar de ser un único
+  servidor MCP (DEC-043/059).
+- **Resultado HTTP:** nueva variante aditiva `ExecutionOutcome.kind === "executed-http"`
+  (`statusCode`, `responseBytes`) — nunca fuerza una respuesta HTTP dentro de los campos SSH de
+  `"executed"`; el cuerpo de la respuesta nunca se registra (DEC-060).
+- **Autenticación:** Personal Access Token vía `SecretKind "token"` ya existente — sin OAuth ni
+  `SecretKind` nuevo en esta fase; el usuario registra el PAT manualmente vía Secrets Broker
+  (DEC-061).
+- **Alcance funcional:** 3 operaciones GitHub con plantilla fija (`create_issue`, `list_issues`,
+  `comment_on_issue`) — nunca método/path/body HTTP libre del agente (DEC-062).
+- **Dependencia HTTP:** `fetch` nativo de Node, sin librería nueva (DEC-063).
+- **Limitación heredada, documentada explícitamente:** ni `execution-ssh` ni `connector-github`
+  tienen hoy un canal real hacia el Secrets Broker en producción — ambos reciben el secreto vía una
+  función inyectada sin implementación real (DEC-010 sigue sin implementación en ningún sistema
+  operativo). Fuera de alcance de Fase 11, candidata a Fase 13 o una fase dedicada.
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando

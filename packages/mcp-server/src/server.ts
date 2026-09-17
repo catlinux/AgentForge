@@ -17,7 +17,11 @@ export interface McpServerDeps {
   readonly discover: () => Promise<readonly DiscoveredToolView[]>;
   readonly resolveToolEntry: (mcpToolName: string) => Promise<ToolEntry | undefined>;
   readonly evaluate: (entry: ToolEntry) => Promise<PolicyDecision>;
-  readonly executionClient: ExecutionChannelClient;
+  /** Selects which Execution Backend process handles a tool, by `ToolEntry.origin.id` (Fase 11,
+   * DEC-058) — e.g. "execution-ssh", "connector-github". `undefined` means no backend is
+   * configured for that origin (fail-closed, DEC-047). Still a single MCP server (DEC-043) —
+   * this only routes among backend *processes*, it does not split the server itself. */
+  readonly resolveExecutionClient: (originId: string) => ExecutionChannelClient | undefined;
   readonly resolveHostId: (args: Readonly<Record<string, unknown>>) => string;
   readonly progressIntervalMs: number;
   /** Optional (DEC-052/057): best-effort audit writer for this process's own events. */
@@ -62,7 +66,7 @@ export function createMcpServer(deps: McpServerDeps): Server {
     const result = await handleToolCall(request.params.name, stringArgs, hostId, sessionId, {
       resolveToolEntry: deps.resolveToolEntry,
       evaluate: deps.evaluate,
-      executionClient: deps.executionClient,
+      resolveExecutionClient: deps.resolveExecutionClient,
       sendProgress: () => {
         void extra.sendNotification({
           method: "notifications/progress",

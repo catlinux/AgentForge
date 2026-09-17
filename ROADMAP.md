@@ -20,8 +20,8 @@ decisiones de arquitectura que todavía están abiertas.
 | 7 | Ejecución remota / SSH | **En curso** — 6 decisiones aprobadas (DEC-037 a DEC-042) |
 | 8 | Integración MCP | **En curso** — 5 decisiones aprobadas (DEC-043 a DEC-047) |
 | 9 | Sessions | **En curso** — 4 decisiones aprobadas (DEC-048 a DEC-051) |
-| 10 | Audit Log | **En curso** — 6 decisiones aprobadas (DEC-052 a DEC-057) |
-| 11 | Connectors | Propuesta, no iniciada |
+| 10 | Audit Log | **Completada** — 6 decisiones aprobadas (DEC-052 a DEC-057) |
+| 11 | Connectors | **Completada** — 6 decisiones aprobadas (DEC-058 a DEC-063) |
 | 12 | Dashboard Web | Propuesta, no iniciada |
 | 13 | Hardening de seguridad | Propuesta, no iniciada |
 | 14 | Testing e integración | Propuesta, no iniciada |
@@ -127,8 +127,18 @@ de ellas.
   de `OperationHash`), propagado a Execution y a cancelación; minimización estricta de datos
   (nunca secretos/claves/stdout-stderr completos/parámetros en bruto); persistencia best effort,
   nunca bloqueante ni condicionante de la operación real.
-- **Fase 11 — Connectors**: integraciones concretas con servicios externos (GitHub, Dropbox, etc.),
-  solo tras autorización explícita.
+- **Fase 11 — Connectors**: integraciones concretas con servicios externos. 6 decisiones aprobadas
+  (DEC-058 a DEC-063, ver `decisions/DECISIONS.md`): patrón "Connector Execution Backend" —
+  paquete propio por conector (`packages/connector-github`), mismo patrón de proceso separado que
+  `execution-ssh` (DEC-047/042); reutilización del contrato `ExecutionRequest`/`ExecutionOutcome`
+  existente, con una nueva variante `"executed-http"` aditiva; autenticación por Personal Access
+  Token vía `SecretKind "token"` ya existente, sin OAuth en esta fase; 3 operaciones GitHub con
+  plantilla fija (`create_issue`, `list_issues`, `comment_on_issue`), nunca HTTP arbitrario;
+  `fetch` nativo de Node, sin dependencia HTTP nueva. El servidor MCP enruta entre procesos
+  Execution Backend por `ToolEntry.origin.id`, sin dejar de ser un único servidor MCP (DEC-043).
+  Limitación conocida y heredada de `execution-ssh`: ningún backend tiene hoy un canal real hacia
+  el Secrets Broker en producción (DEC-010 sin implementación real) — fuera de alcance de esta
+  fase, candidata a Fase 13 o una fase dedicada.
 - **Fase 12 — Dashboard Web**: interfaz de administración/visualización.
 - **Fase 13 — Hardening de seguridad**: revisión y refuerzo de seguridad de todo lo anterior.
 - **Fase 14 — Testing e integración**: pruebas automatizadas y de integración end-to-end.

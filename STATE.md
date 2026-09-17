@@ -13,33 +13,30 @@ copiar).
 
 ## Fase actual
 
-**Fase 10 — Audit Log**
+**Fase 11 — Connectors**
 
-**Estado:** EXECUTE + VERIFY completados (2026-09-17) — 6 decisiones aprobadas (DEC-052 a
-DEC-057: cada proceso, MCP server y Execution, escribe sus propios eventos de forma autónoma sin
-componente/proceso dedicado nuevo; persistencia JSON Lines append-only, un fichero por proceso,
-permisos `0o600`, sin SQLite por riesgo de dependencia nativa ya demostrado en Fase 7; modelo
-`operationId` nuevo y distinto de `SessionId`/`OperationHash`, único por invocación de
-`tools/call`, generado una vez por el servidor MCP; minimización estricta de datos (nunca
-secretos, contenido de stdout/stderr, valores de parámetros, hostname/username); `sessionId` y
-`operationId` propagados juntos a través de `ExecutionRequest`/`ExecutionChannelRequest`/contrato
-de cancelación, sin tocar Policy Engine, `OperationHashRegistry` ni la lógica de ejecución;
-Audit Log best-effort y no bloqueante — un fallo de escritura nunca aborta ni condiciona la
-operación real). Ver `decisions/DECISIONS.md` para el registro formal.
+**Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 6 decisiones aprobadas
+(DEC-058 a DEC-063: patrón "Connector Execution Backend" — paquete propio por conector
+(`packages/connector-github`), mismo proceso separado que Execution SSH; reutilización del
+contrato `ExecutionRequest`/`ExecutionOutcome`/`ExecutionChannelRequest` existente, con enrutamiento
+por `ToolEntry.origin.id` en el servidor MCP; nueva variante aditiva `"executed-http"` para
+resultados HTTP, nunca forzados en los campos SSH; autenticación por Personal Access Token vía
+`SecretKind "token"` ya existente, sin OAuth en esta fase; 3 operaciones GitHub con plantilla fija,
+nunca HTTP libre del agente; `fetch` nativo de Node, sin dependencia HTTP nueva). Durante EXECUTE
+se verificó, a petición explícita del usuario, que no existe hoy ningún canal real Execution↔
+Secrets Broker en producción (limitación ya heredada de Fase 7, no exclusiva de esta fase) — se
+mantuvo el mismo patrón de inyección ya usado por `execution-ssh`, sin abrir ni ampliar DEC-010.
+Ver `decisions/DECISIONS.md` para el registro formal.
 
-**Implementación:** módulo `packages/shared/src/audit/` (`OperationId`/`generateOperationId`,
-modelo de eventos `AuditEvent`/`AuditEventInput`, `AuditWriter` JSON Lines best-effort);
-`ExecutionRequest`/`ExecutionChannelRequest` y el contrato de cancelación (`ExecutionChannelClient
-.cancel()`) ampliados con `sessionId`+`operationId`; `tools-call.ts` genera el `operationId` y
-escribe `tool-invoked`/`policy-decided`/`operation-cancelled`/`execution-completed`
-(caso IPC no disponible); `execution-server.ts` recibe `sessionId`/`operationId` (antes se
-descartaba `sessionId` silenciosamente — corregido) y escribe `confirmation-resolved` (en
-cancelación) y `execution-completed`. Extensión estructural mínima y explícitamente autorizada de
-Fase 7: `truncated: boolean` en `TruncatedOutput`/`ExecutionOutcome`/`SshExecResult`, sustituyendo
-un heurístico frágil de búsqueda de texto por un dato estructural ya calculado — sin cambiar
-límites ni comportamiento de truncamiento SSH. **Ningún sistema remoto real tocado**, ningún
-despliegue externo. Fases 3 a 9 siguen vigentes; el único cambio sobre tipos ya cerrados es la
-ampliación estructural de Fase 7 descrita arriba, explícitamente autorizada durante EXECUTE.
+**Implementación:** paquete nuevo `packages/connector-github/` completo (config declarativa,
+máquina de confirmación duplicada con nombres neutros, cliente HTTP sobre `fetch`, orquestador,
+servidor IPC); `ExecutionOutcome`/`ExecutionCompletedEvent` ampliados de forma aditiva con
+`"executed-http"`; `packages/mcp-server` cambia de un `executionClient` fijo a
+`resolveExecutionClient(originId)`, fail-closed si no hay backend configurado;
+`packages/execution-ssh` con un único cambio aditivo (`statusCode`/`responseBytes: undefined` en
+sus dos escrituras de `execution-completed`). **Ningún sistema remoto real tocado** — sin token de
+GitHub real, sin llamada HTTP real fuera de tests. Fases 3 a 10 siguen vigentes sin cambios
+estructurales.
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
@@ -50,12 +47,12 @@ APROBADO E IMPLEMENTADO (Fase 5: DEC-023 a DEC-029) + SECRETS BROKER APROBADO E 
 (Fase 6: DEC-030 a DEC-036) + EJECUCIÓN REMOTA/SSH APROBADA E IMPLEMENTADA (Fase 7: DEC-037 a
 DEC-042) + INTEGRACIÓN MCP APROBADA E IMPLEMENTADA (Fase 8: DEC-043 a DEC-047) + SESSIONS
 APROBADAS E IMPLEMENTADAS (Fase 9: DEC-048 a DEC-051) + AUDIT LOG APROBADO E IMPLEMENTADO
-(Fase 10: DEC-052 a DEC-057). Resto documentado como PROPOSAL/OPEN QUESTION en
-`architecture/ARCHITECTURE.md` §20.
+(Fase 10: DEC-052 a DEC-057) + CONNECTORS APROBADO E IMPLEMENTADO (Fase 11: DEC-058 a DEC-063).
+Resto documentado como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 10 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
+Fase 11 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
 y de autorización explícita y separada de `git commit` y `git push` (todavía no solicitadas ni
 concedidas para esta fase).
 
@@ -802,6 +799,80 @@ decisión automática.
       corregidos). **Pendiente:** autorización explícita y separada de `git commit` y de
       `git push` para esta segunda ronda — todavía no concedidas.
 
+### Fase 11 — Connectors (INSPECT + PLAN + EXECUTE + VERIFY completados, 2026-09-17)
+- [x] Proceso agrupado a petición del usuario (una sola ronda para INSPECT→PLAN→EXECUTE→VERIFY,
+      con parada solo ante decisiones arquitectónicas reales): INSPECT completo del repo (roadmap,
+      decisiones previas, estructura de código, dependencias) → identificado el vacío real (sin
+      DEC previa, `ToolOriginKind` sin valor de conector, `SecretKind` sin OAuth, sin dependencias
+      HTTP) → PLAN completo con 6 decisiones candidatas (DEC-058 a DEC-063) presentado y aprobado
+      → verificación explícita solicitada por el usuario antes de EXECUTE: si existe un canal real
+      Execution↔Secrets Broker (no existe — descubierto que ni siquiera `execution-ssh` lo tiene en
+      producción) → comparación de 2 alternativas arquitectónicas presentada y resuelta a favor de
+      mantener el patrón de inyección ya usado por `execution-ssh`, sin abrir una decisión nueva
+      sobre el canal real → EXECUTE completo → VERIFY completo.
+- [x] **DEC-058** — Modelo general: paquete propio por conector (`packages/connector-github`),
+      mismo patrón de proceso Execution separado que `execution-ssh` (DEC-042/047).
+- [x] **DEC-059** — Reutilización del contrato `ExecutionRequest`/`ExecutionOutcome`/
+      `ExecutionChannelRequest` existente, sin nuevo protocolo; `hostId` reinterpretado como
+      identificador de cuenta (ya opaco en su tipo); el servidor MCP enruta entre procesos
+      Execution Backend por `ToolEntry.origin.id` vía `resolveExecutionClient`, sigue habiendo un
+      único servidor MCP (DEC-043).
+- [x] **DEC-060** — Nueva variante aditiva `ExecutionOutcome.kind === "executed-http"`
+      (`statusCode`, `responseBytes`) en vez de forzar una respuesta HTTP en los campos SSH de
+      `"executed"`; el cuerpo de la respuesta nunca se registra (extiende DEC-055).
+- [x] **DEC-061** — Autenticación por Personal Access Token vía `SecretKind "token"` ya existente,
+      sin OAuth ni `SecretKind` nuevo en esta fase.
+- [x] **DEC-062** — Alcance funcional: 3 operaciones GitHub (`create_issue`, `list_issues`,
+      `comment_on_issue`) con plantilla fija de endpoint+método+payload — nunca HTTP libre del
+      agente, mismo principio que DEC-037.
+- [x] **DEC-063** — `fetch` nativo de Node, sin dependencia HTTP nueva.
+- [x] **Hallazgo verificado antes de EXECUTE (a petición explícita del usuario):** ningún proceso
+      Execution Backend tiene hoy un canal real hacia el Secrets Broker en producción — DEC-010
+      (Fase 2) solo autoriza un canal Core↔Secrets Broker, sin implementación real en ningún
+      sistema operativo (`packages/core/src/transport/index.ts` y
+      `packages/secrets-broker/src/transport/index.ts` son placeholders vacíos desde la Fase 2);
+      `execution-ssh`'s `getSshKeySecret` ya es una función inyectada sin implementación real,
+      solo mockeada en tests. Presentadas 2 alternativas (ampliar DEC-010 ahora vs. mantener el
+      patrón de inyección como limitación heredada) — **elegida la segunda**: `connector-github`
+      usa `getTokenSecret` inyectado, exactamente igual que `execution-ssh`, documentado como
+      limitación compartida, sin reabrir DEC-010.
+- [x] Implementación: paquete nuevo `packages/connector-github/` — `config/` (`account-config.ts`,
+      `operation-template.ts`, análogos a `host-config.ts`/`command-template.ts` de Fase 7);
+      `confirmation/` (duplicado del módulo de confirmación de `execution-ssh` con nombres neutros
+      — `accountLabel`/`operationSummary` en vez de `hostname`/`resolvedCommand` — deliberadamente
+      no compartido entre paquetes, cada Execution Backend con su propia máquina de confirmación);
+      `github/client.ts` (`fetch` nativo, `AbortController` para timeout, nunca registra el cuerpo
+      de la respuesta); `execute.ts` (orquestador, mismo flujo que `execution-ssh`'s `execute.ts`);
+      `ipc/connector-server.ts` (servidor IPC, mismo patrón que `execution-server.ts`, canal propio
+      `agentforge-connector-github` distinto del de SSH). `packages/shared`: `ExecutionOutcome`
+      gana `"executed-http"` (aditivo); `ExecutionCompletedEvent` gana `"executed-http"` y los
+      campos `statusCode`/`responseBytes` (aditivo). `packages/mcp-server`: `tools-call.ts`/
+      `server.ts` cambian de un `executionClient` fijo a `resolveExecutionClient(originId)`, con
+      fail-closed explícito (`execution-completed{outcomeKind:"execution-unavailable"}`) cuando no
+      hay backend configurado para el origen. `packages/execution-ssh/src/ipc/execution-server.ts`:
+      único cambio, los dos `execution-completed` que escribe ahora incluyen
+      `statusCode`/`responseBytes: undefined` (campos nuevos obligatorios en el tipo).
+- [x] Tests nuevos: 54 en `packages/connector-github` (hash-registry, pending-confirmations,
+      operation-hash, confirm, operation-template, github/client, execute, ipc/connector-server) +
+      3 en `packages/mcp-server/src/tools-call.test.ts` (enrutamiento por `origin.id`, fail-closed
+      sin backend configurado, evento de auditoría correspondiente).
+- [x] Alcance respetado: `execution-ssh` no modificado salvo el campo aditivo ya descrito; Policy
+      Engine, Secrets Broker, Registry, Discovery, `OperationHashRegistry` sin tocar; ningún
+      sistema remoto real tocado (sin token de GitHub real, sin llamada HTTP real fuera de tests,
+      `fetch` siempre mockeado); sigue habiendo un único servidor MCP (DEC-043 no reabierta);
+      `ToolOriginKind` no modificado (el conector reutiliza el valor `"agentforge"` ya reservado
+      y sin uso real previo).
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 6 paquetes (incluido el nuevo); `pnpm
+      run lint` sin errores (tras corregir 2 avisos menores de variables no usadas); `pnpm run
+      format` correcto (tras `--write` sobre 8 ficheros); `pnpm run test` — 216/218 correctos (2
+      omitidos en Windows, heredados de Fase 6), incluidos 57 tests nuevos; `pnpm run build`
+      correcto en los 6 paquetes; `pnpm install --frozen-lockfile` correcto (el nuevo paquete solo
+      añade `@agentforge/shared` como dependencia de workspace, sin dependencias de runtime
+      externas); grep de secretos/`console.*`/llamadas de red reales sin coincidencias; `git
+      status` revisado en su totalidad (10 ficheros modificados, paquete nuevo completo sin
+      trackear). **Pendiente:** autorización explícita y separada de `git commit` y de `git push`
+      — todavía no concedidas.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -899,6 +970,12 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-056** — `sessionId` y `operationId` propagados juntos a Execution y al contrato de
   cancelación.
 - **DEC-057** — Audit Log best-effort y no bloqueante: nunca condiciona la operación real.
+- **DEC-058** — Connectors: paquete propio por conector, mismo patrón que Execution SSH.
+- **DEC-059** — Reutilización del contrato Execution existente; enrutamiento por `origin.id`.
+- **DEC-060** — Nueva variante aditiva `ExecutionOutcome` para resultados HTTP.
+- **DEC-061** — Autenticación por Personal Access Token vía `SecretKind "token"` existente.
+- **DEC-062** — Alcance funcional: operaciones GitHub con plantilla fija, nunca HTTP libre.
+- **DEC-063** — `fetch` nativo de Node, sin dependencia HTTP nueva.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -990,30 +1067,39 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `5c4833da1cb475a164ab0dd08c25c3edccb8638a` (corto: `5c4833d`)
+- Hash: `8d6670e78a590022b5f0e65eeb8af45fa8c39ed8` (corto: `8d6670e`)
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `feat+docs: implementa Sessions — Fase 9 (DEC-048 a DEC-051)`
-- Contenido: 17 archivos, 448 inserciones/65 eliminaciones — `SessionId`/`generateSessionId` en
-  `packages/shared/src/session/`; `ExecutionChannelRequest` ampliado con `sessionId` de
-  correlación; propagación en `server.ts`/`tools-call.ts` del servidor MCP con 6 tests nuevos
-  (140 en total); `DEVELOPMENT.md`, `ROADMAP.md`, `STATE.md`, `architecture/ARCHITECTURE.md`/
-  `.en.md`, `decisions/DECISIONS.md` (actualizados con DEC-048 a DEC-051).
-- Commits anteriores: `6bdec65` (Fase 8), `86571b7` (Fase 7), `b48670d` (Fase 6), `2411dc3`
-  (Fase 5), `624581e` (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1),
-  `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
+- Mensaje: `fix: corrige el Audit Log de Fase 10 tras revisión de código real (DEC-052 a DEC-057)`
+- Contenido: 16 archivos, 601 inserciones/30 eliminaciones — segunda ronda de correcciones de
+  Fase 10 tras revisión del código publicado: componente nuevo `PendingConfirmations`
+  (`packages/execution-ssh/src/confirmation/pending-confirmations.ts`) para distinguir
+  cancelación durante confirmación genuinamente pendiente de cancelación sin nada que cancelar,
+  sin tocar `OperationHashRegistry`; eventos `confirmation-requested`/`confirmation-resolved`
+  añadidos al flujo real de `confirmOperation()`; `stdoutBytes`/`stderrBytes` en
+  `ExecutionOutcome`/`ExecutionCompletedEvent`; evento terminal para el caso `unknown-tool`. 15
+  tests nuevos (159/161 en total, 2 omitidos en Windows).
+- Commit anterior directo: `30ee62a` (`feat+docs: implementa Audit Log — Fase 10 (DEC-052 a
+  DEC-057)`, primera implementación de la fase).
+- Commits anteriores: `5c4833d` (Fase 9), `6bdec65` (Fase 8), `86571b7` (Fase 7), `b48670d`
+  (Fase 6), `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2),
+  `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
 
 ## Estado del push
 
 - **Realizado** (2026-09-17, con autorización explícita del usuario). `master` sincronizado con
-  `origin/master` (`5c4833d`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
+  `origin/master` (`8d6670e`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
   al mismo hash).
 
 ## Próxima acción recomendada
 
-1. Pedir autorización explícita para el commit+push de los cambios de la Fase 9 (DEC-048 a
-   DEC-051, implementación de `SessionId` y su propagación mínima, documentación sincronizada).
-2. Tras el commit/push, presentar únicamente el resumen de objetivos y decisiones a analizar de la
-   Fase 10 (Audit Log) — sin implementar nada de esa fase todavía.
+1. **Fase 10 (Audit Log) está cerrada**: 6 decisiones aprobadas (DEC-052 a DEC-057), implementada,
+   corregida tras revisión de código real, verificada, commiteada y pusheada (`8d6670e`).
+2. **Fase 11 (Connectors) en curso de planificación** — INSPECT completado (2026-09-17): no existe
+   ninguna DEC previa sobre conectores; `ToolOriginKind` solo admite `"agentforge" | "mcp-server"`;
+   `SecretKind` no tiene un valor específico de OAuth; no hay dependencias HTTP/OAuth instaladas;
+   el patrón `packages/execution-<nombre>` (DEC-008/042) es la referencia directa, con
+   `packages/execution-ssh` como único precedente real. PLAN pendiente de presentar y aprobar antes
+   de EXECUTE.
 3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
    `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`; el transporte IPC real Core↔Secrets

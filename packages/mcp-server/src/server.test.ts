@@ -70,7 +70,7 @@ function makeDeps(captured: ExecutionChannelRequest[]): McpServerDeps {
     discover: async () => [view],
     resolveToolEntry: async () => entry,
     evaluate: async () => allowDecision(),
-    executionClient,
+    resolveExecutionClient: () => executionClient,
     resolveHostId: () => "host-1",
     progressIntervalMs: 1000,
   };

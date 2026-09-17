@@ -101,7 +101,7 @@ source to govern — but this is a sequencing PROPOSAL, not a final architecture
 | **Tool Discovery** | Mechanism for an agent to find/select relevant tools without loading the whole catalog into context. | PROPOSAL — see §5 |
 | **Permission / Policy Engine** | Classifies actions by risk/reversibility and decides to auto-run, require an allowlist, or demand human confirmation. Only for what Claude Code doesn't already cover (actions going through the gateway). | PROPOSAL |
 | **Secrets Broker** | Custodies credentials (SSH keys, tokens). Separate process, own OS user (DEC-004). Never exposes secrets directly to the agent. | DECISION (threat model) + PROPOSAL (implementation) |
-| **Execution Backends** | Run real actions: SSH executor (phase 1), API connectors (future). Build commands in a parameterized way, never by interpolating LLM-generated strings. | PROPOSAL |
+| **Execution Backends** | Run real actions: SSH executor (Phase 7, DEC-037 to DEC-042) and the GitHub connector (Phase 11, DEC-058 to DEC-063) are implemented; the pattern is open to more connectors. Build commands/operations in a parameterized way, never by interpolating LLM-generated strings. | DECISION + IMPLEMENTED (see §9) |
 | **Audit Log** | Append-only record of every proposed/executed action, policy decision, and outcome. Outside the agent's write access. | PROPOSAL |
 | **Own MCP Server(s)** | Expose AgentForge's capabilities to Claude Code (and any other compatible MCP client) following the `2026-07-28` specification (DEC-005). | DECISION (scope) + PROPOSAL (implementation) |
 | **Policy Hook Service** | Receives `PreToolUse`/`PostToolUse` events from Claude Code, applies cross-cutting policy. | PROPOSAL, sequenced after own MCP (see §1) |
@@ -395,6 +395,26 @@ servers themselves and therefore **cannot be implemented in this phase** (touchi
 systems is forbidden), but should be planned for when Phase 7 (remote execution/SSH) of the
 roadmap is authorized.
 
+**DECISION (DEC-058 to DEC-063, Phase 11 — Connectors):** the "API connector (future)" mentioned
+as PROPOSAL under the **Execution Backends** component (§2) is now decided and materialized with a
+first real connector, GitHub — see `decisions/DECISIONS.md`. Summary: **same pattern as SSH
+Execution** — its own package (`packages/connector-github`), an independent Execution process,
+never a child of the MCP server (DEC-058); reuses `ExecutionRequest`/`ExecutionOutcome`/
+`ExecutionChannelRequest` with no new protocol, with `hostId` reinterpreted as the configured
+account identifier (already opaque in its type) — the MCP server routes between Execution Backend
+processes by `ToolEntry.origin.id`, still a single MCP server (DEC-043/059); a new additive
+variant `ExecutionOutcome.kind === "executed-http"` with `statusCode`/`responseBytes` — never
+forcing an HTTP response into `"executed"`'s SSH-shaped fields, the response body is never
+recorded (DEC-060); authentication via a Personal Access Token through the already-existing
+`SecretKind "token"`, no OAuth in this phase (DEC-061); 3 GitHub operations with a fixed
+endpoint+method+payload template — never a free-form HTTP method/path/body from the agent, same
+principle as DEC-037 (DEC-062); Node's native `fetch`, no new HTTP dependency (DEC-063). **Known
+limitation, shared with SSH Execution:** neither Execution Backend has a real channel to the
+Secrets Broker in production today — both receive the secret through an injected function with no
+real implementation (the Core↔Secrets Broker channel from DEC-010 still has no implementation on
+any operating system); out of scope for this phase, a candidate for Phase 13 (Hardening) or a
+dedicated phase.
+
 ---
 
 ## 10. MCP integration
@@ -632,7 +652,9 @@ specific to Phase 1:
   Backends) allows adding new Execution Backends (API connectors, other protocols) without
   touching the Policy Engine or the Secrets Broker — this is, in part, the same separation-of-
   concerns principle observed in several Phase 0.7 projects (Auth/Proxy/Functions in Nango, Local
-  Zone/Platform Zone in Arcade).
+  Zone/Platform Zone in Arcade). **Confirmed in practice in Phase 11** (DEC-058 to DEC-063, see
+  §9): the GitHub connector was added as `packages/connector-github` without touching
+  `execution-ssh`, the Policy Engine, or the Secrets Broker.
 - **i18n:** following `README.md` (Spanish initial interface, architecture prepared for future
   i18n without implementing it yet), it is proposed that any human-facing text AgentForge
   generates in the future (confirmation messages, readable log entries, error messages) avoid

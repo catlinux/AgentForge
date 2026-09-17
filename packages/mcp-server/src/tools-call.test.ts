@@ -37,8 +37,12 @@ function allowDecision(): PolicyDecision {
   };
 }
 
-function makeDeps(overrides: Partial<ToolsCallDeps> = {}): ToolsCallDeps {
-  const executionClient: ExecutionChannelClient = {
+function makeDeps(
+  overrides: Partial<Omit<ToolsCallDeps, "resolveExecutionClient">> & {
+    executionClient?: ExecutionChannelClient;
+  } = {},
+): ToolsCallDeps {
+  const executionClient: ExecutionChannelClient = overrides.executionClient ?? {
     connect: vi.fn(async () => undefined),
     request: vi.fn(
       async () =>
@@ -62,11 +66,13 @@ function makeDeps(overrides: Partial<ToolsCallDeps> = {}): ToolsCallDeps {
   return {
     resolveToolEntry: vi.fn(async () => entry),
     evaluate: vi.fn(async () => allowDecision()),
-    executionClient,
     sendProgress: vi.fn(),
     cancelled: new AbortController().signal,
     progressIntervalMs: 20,
     ...overrides,
+    // Set after the override spread so a passed-in `executionClient` (consumed above to build
+    // `executionClient`) never leaks into `ToolsCallDeps`, which has no such property.
+    resolveExecutionClient: () => executionClient,
   };
 }
 
@@ -136,31 +142,29 @@ describe("handleToolCall (DEC-045)", () => {
   it("cancellation before Execution responds propagates cancel() and returns immediately", async () => {
     const controller = new AbortController();
     let requestResolved = false;
-    const deps = makeDeps({
-      cancelled: controller.signal,
-      executionClient: {
-        connect: vi.fn(async () => undefined),
-        request: vi.fn(async (): Promise<ExecutionChannelResponse> => {
-          await new Promise((r) => setTimeout(r, 200));
-          requestResolved = true;
-          return {
-            ok: true,
-            outcome: {
-              kind: "executed",
-              exitCode: 0,
-              stdout: "",
-              stderr: "",
-              stdoutTruncated: false,
-              stderrTruncated: false,
-              stdoutBytes: 0,
-              stderrBytes: 0,
-            },
-          };
-        }),
-        cancel: vi.fn(async () => undefined),
-        close: vi.fn(async () => undefined),
-      },
-    });
+    const executionClient: ExecutionChannelClient = {
+      connect: vi.fn(async () => undefined),
+      request: vi.fn(async (): Promise<ExecutionChannelResponse> => {
+        await new Promise((r) => setTimeout(r, 200));
+        requestResolved = true;
+        return {
+          ok: true,
+          outcome: {
+            kind: "executed",
+            exitCode: 0,
+            stdout: "",
+            stderr: "",
+            stdoutTruncated: false,
+            stderrTruncated: false,
+            stdoutBytes: 0,
+            stderrBytes: 0,
+          },
+        };
+      }),
+      cancel: vi.fn(async () => undefined),
+      close: vi.fn(async () => undefined),
+    };
+    const deps = makeDeps({ cancelled: controller.signal, executionClient });
 
     const callPromise = handleToolCall("mcp-fs:read_file", {}, "host-1", sessionId, deps);
     controller.abort();
@@ -168,7 +172,7 @@ describe("handleToolCall (DEC-045)", () => {
 
     expect(result).toEqual({ isError: true, content: "Cancelled" });
     expect(requestResolved).toBe(false); // handleToolCall did not wait for the slow request
-    expect(vi.mocked(deps.executionClient.cancel)).toHaveBeenCalledWith(
+    expect(vi.mocked(executionClient.cancel)).toHaveBeenCalledWith(
       identity,
       "host-1",
       {},
@@ -264,5 +268,106 @@ describe("handleToolCall (DEC-045)", () => {
 
     await handleToolCall("mcp-fs:read_file", { path: "/a" }, "host-1", sessionId, deps);
     expect(captured?.sessionId).toBe(sessionId);
+  });
+});
+
+describe("handleToolCall: Execution Backend routing by origin.id (Fase 11, DEC-058)", () => {
+  const githubEntry: ToolEntry = {
+    ...entry,
+    identity: "tool-github" as ToolIdentity,
+    origin: { id: "connector-github", kind: "agentforge" },
+    qualifiedName: "connector-github:create_issue" as ToolEntry["qualifiedName"],
+  };
+
+  it("resolveExecutionClient is called with the resolved entry's origin.id, not a fixed value", async () => {
+    const seenOriginIds: string[] = [];
+    const executionClient: ExecutionChannelClient = {
+      connect: vi.fn(async () => undefined),
+      request: vi.fn(
+        async () =>
+          ({
+            ok: true,
+            outcome: {
+              kind: "executed",
+              exitCode: 0,
+              stdout: "",
+              stderr: "",
+              stdoutTruncated: false,
+              stderrTruncated: false,
+              stdoutBytes: 0,
+              stderrBytes: 0,
+            },
+          }) as ExecutionChannelResponse,
+      ),
+      cancel: vi.fn(async () => undefined),
+      close: vi.fn(async () => undefined),
+    };
+    const deps: ToolsCallDeps = {
+      resolveToolEntry: vi.fn(async () => githubEntry),
+      evaluate: vi.fn(async () => allowDecision()),
+      resolveExecutionClient: (originId: string) => {
+        seenOriginIds.push(originId);
+        return executionClient;
+      },
+      sendProgress: vi.fn(),
+      cancelled: new AbortController().signal,
+      progressIntervalMs: 20,
+    };
+
+    await handleToolCall("connector-github:create_issue", {}, "account-1", sessionId, deps);
+    expect(seenOriginIds).toEqual(["connector-github"]);
+  });
+
+  it("no Execution Backend configured for the origin: fails closed without ever calling request/cancel", async () => {
+    const request = vi.fn();
+    const cancel = vi.fn();
+    const unreachableClient: ExecutionChannelClient = {
+      connect: vi.fn(async () => undefined),
+      request,
+      cancel,
+      close: vi.fn(async () => undefined),
+    };
+    const deps: ToolsCallDeps = {
+      resolveToolEntry: vi.fn(async () => githubEntry),
+      evaluate: vi.fn(async () => allowDecision()),
+      // Only "execution-ssh" is configured — "connector-github" has no backend registered.
+      resolveExecutionClient: (originId: string) =>
+        originId === "execution-ssh" ? unreachableClient : undefined,
+      sendProgress: vi.fn(),
+      cancelled: new AbortController().signal,
+      progressIntervalMs: 20,
+    };
+
+    const result = await handleToolCall(
+      "connector-github:create_issue",
+      {},
+      "account-1",
+      sessionId,
+      deps,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("connector-github");
+    expect(request).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it("no Execution Backend configured: writes execution-completed(execution-unavailable) to the audit log", async () => {
+    const events: Array<{ type: string }> = [];
+    const recordingAuditWriter = { write: async (e: { type: string }) => void events.push(e) };
+    const deps: ToolsCallDeps = {
+      resolveToolEntry: vi.fn(async () => githubEntry),
+      evaluate: vi.fn(async () => allowDecision()),
+      resolveExecutionClient: () => undefined,
+      sendProgress: vi.fn(),
+      cancelled: new AbortController().signal,
+      progressIntervalMs: 20,
+      auditWriter: recordingAuditWriter as unknown as NonNullable<ToolsCallDeps["auditWriter"]>,
+    };
+
+    await handleToolCall("connector-github:create_issue", {}, "account-1", sessionId, deps);
+
+    const completed = events.find((e) => e.type === "execution-completed");
+    expect(completed).toMatchObject({ outcomeKind: "execution-unavailable" });
   });
 });

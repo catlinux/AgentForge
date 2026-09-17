@@ -1233,6 +1233,156 @@ Format per a cada decisió futura:
   Coherente con DEC-027 (Policy Engine no depende del Audit Log para su propia lógica). El Audit
   Log es evidencia persistente, nunca un mecanismo de control de ejecución.
 
+## DEC-058 — Modelo general de Connectors: Execution Backend propio por conector (Fase 11)
+
+- Fecha: 2026-09-17
+- Contexto: DEC-008/DEC-042 ya reservan el patrón `packages/execution-<nombre>` para backends de
+  ejecución nuevos; `packages/execution-ssh` es el único precedente real. Había que decidir cómo
+  materializar un conector API de terceros (GitHub) dentro de ese patrón.
+- Opciones consideradas: (A) un paquete propio por conector (`packages/connector-github`, futuro
+  `packages/connector-dropbox`), cada uno un proceso Execution independiente, análogo 1:1 a
+  `execution-ssh`; (B) un único paquete genérico `packages/connectors` con todos los conectores
+  como módulos internos de un solo proceso; (C) integrar los conectores directamente dentro de
+  `execution-ssh` o del servidor MCP.
+- Decisión: **(A)**. Cada conector es una superficie de confianza distinta (credenciales propias,
+  API propia) — mezclar varios en un proceso reduce el aislamiento sin beneficio real. Coherente
+  con el criterio ya aplicado repetidamente de "un paquete por responsabilidad, sin macromódulos"
+  (DEC-017/022/029/042/051/052). Nuevo paquete: `packages/connector-github`, con su propio proceso
+  Execution (arrancado igual que `execution-ssh`, independiente, nunca hijo del servidor MCP —
+  mismo patrón DEC-047 E1b) y su propio canal IPC hacia el servidor MCP.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, PLAN presentado agrupado para toda la
+  Fase 11).
+- Consecuencias: el servidor MCP pasa a hablar con más de un proceso Execution simultáneamente por
+  primera vez — ver DEC-059 (Parte 3) para el mecanismo de enrutamiento. No reabre DEC-043 (sigue
+  habiendo un único servidor MCP) ni DEC-047 (cada backend sigue siendo un proceso separado con
+  fail-closed uniforme).
+
+## DEC-059 — Reutilización del contrato IPC/Execution existente, sin nuevo protocolo (Fase 11)
+
+- Fecha: 2026-09-17
+- Contexto: `ExecutionRequest`/`ExecutionOutcome`/`ExecutionChannelRequest`/`ExecutionChannelClient`
+  (Fase 7/8/10) ya modelan petición→ejecución→resultado con `identity`/`parameters`/`sessionId`/
+  `operationId`/`PolicyDecision`. El único campo con semántica SSH-específica en el nombre es
+  `hostId: string` en `ExecutionRequest` — pero su tipo ya es un `string` opaco, sin ningún tipado
+  SSH-específico.
+- Opciones consideradas: (A) reutilizar `ExecutionRequest`/`ExecutionOutcome` tal cual,
+  reinterpretando `hostId` como "identificador de la conexión/cuenta configurada"; (B) crear un
+  contrato paralelo `ConnectorRequest`/`ConnectorOutcome`, duplicando gran parte del modelo;
+  (C) generalizar `ExecutionRequest` renombrando `hostId`, afectando a Fase 7/8/10 ya cerradas.
+- Decisión: **(A)**. `hostId` ya es opaco en su tipo — su semántica actual ("qué configuración de
+  destino usar") es la misma que necesita un conector ("qué cuenta GitHub usar"). Reutilizarlo
+  evita duplicar el contrato (B) y evita tocar tipos de fases ya cerradas (C). El servidor MCP
+  ahora selecciona el `ExecutionChannelClient` correspondiente por `ToolEntry.origin.id` — un
+  `resolveExecutionClient: (originId: string) => ExecutionChannelClient | undefined` en
+  `McpServerDeps`/`ToolsCallDeps`, sustituyendo el anterior cliente único fijo. Devolver
+  `undefined` se trata exactamente igual que una conexión IPC fallida (fail-closed, DEC-047) —
+  nunca un pase silencioso.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: cero cambios de tipo a `ExecutionRequest`/`ExecutionChannelRequest`, solo un
+  comentario ampliado documentando que `hostId` es un identificador de destino genérico, no solo
+  SSH. `packages/mcp-server/src/server.ts` y `tools-call.ts` cambian de un `executionClient` fijo a
+  un selector por origen — sigue habiendo un único servidor MCP (DEC-043), esto solo enruta entre
+  procesos backend.
+
+## DEC-060 — Nueva variante `ExecutionOutcome` para resultados HTTP (Fase 11)
+
+- Fecha: 2026-09-17
+- Contexto: la variante `"executed"` de `ExecutionOutcome` tiene campos diseñados explícitamente
+  para SSH (`exitCode`/`stdout`/`stderr`/truncado/bytes, Fase 7/10). Un conector HTTP no tiene
+  "exit code" ni stdout/stderr; tiene un status code y un cuerpo JSON.
+- Opciones consideradas: (A) añadir una nueva variante a la unión, `{kind: "executed-http",
+  statusCode, responseBytes}`, dejando `"executed"` (SSH) intacta; (B) forzar la respuesta HTTP
+  dentro de la forma `"executed"` existente (p. ej. `stdout` = JSON serializado); (C) reutilizar
+  `"failed"`/`"denied"` para todo lo que no sea 2xx, sin distinguir motivo.
+- Decisión: **(A)**. Mismo principio que llevó a añadir `stdoutTruncated`/`stdoutBytes` en Fase 10
+  en vez de forzar datos ajenos a un campo con semántica ya fijada. Minimización de datos (extiende
+  DEC-055): el cuerpo de la respuesta HTTP **nunca se registra** en el Audit Log ni se retiene más
+  allá de calcular su tamaño — solo `statusCode` y `responseBytes` (total de bytes de la respuesta,
+  calculado antes de descartar el cuerpo, nunca inferido de contenido truncado). `ExecutionOutcome`
+  gana la variante `{kind: "executed-http", statusCode: number, responseBytes: number}`; el evento
+  `ExecutionCompletedEvent.outcomeKind` (DEC-054) gana `"executed-http"` y los campos
+  `statusCode`/`responseBytes` (ambos `number | undefined`, análogos a `stdoutBytes`/`stderrBytes`).
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: extensión aditiva de `ExecutionOutcome` y `ExecutionCompletedEvent` — no toca
+  ningún valor ni campo existente de esos tipos. `execution-ssh` requiere solo un cambio mínimo
+  (los dos puntos donde escribe `execution-completed` añaden `statusCode`/`responseBytes:
+  undefined`, ya que ese backend nunca produce `"executed-http"`). No reabre DEC-052 a DEC-057.
+
+## DEC-061 — Autenticación del conector: PAT vía `SecretKind "token"` existente, sin OAuth (Fase 11)
+
+- Fecha: 2026-09-17
+- Contexto: GitHub soporta Personal Access Tokens (PAT) vía header `Authorization: Bearer <token>`
+  — no requiere flujo OAuth interactivo. `SecretKind = "token"` con `{value, expiresAt?}`
+  (DEC-031) ya modela exactamente esto, sin cambios al Secrets Broker.
+- Opciones consideradas: (A) usar `SecretKind: "token"` existente, PAT configurado manualmente por
+  el usuario fuera de AgentForge y registrado vía el Secrets Broker; (B) implementar flujo OAuth
+  completo (authorization code + refresh token, servidor callback HTTP); (C) añadir un `SecretKind`
+  nuevo `"oauth-token"` sin implementar el flujo.
+- Decisión: **(A)**. Coherente con "no inventar requisitos no soportados" y con el patrón ya
+  establecido de mantener cada fase acotada (DEC-023b, DEC-031 usa `"generic"` en vez de un tipo
+  por proveedor). OAuth completo es una pieza de complejidad considerable no pedida por el
+  ROADMAP, añadible en el futuro sin romper nada de lo construido ahora. Ningún `SecretKind` nuevo.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias — **limitación conocida y documentada**: el usuario debe generar el PAT
+  manualmente en GitHub y registrarlo vía Secrets Broker antes de usar el conector; no hay
+  renovación automática. Fuera de alcance: refresh tokens, expiración gestionada, flujo OAuth
+  interactivo — quedan como decisión futura si se necesitan.
+- **Hallazgo verificado durante EXECUTE, antes de implementar** (a petición explícita del usuario):
+  no existe hoy ningún flujo real por el cual un proceso Execution (SSH o conector) obtenga un
+  secreto real del Secrets Broker en producción. DEC-010 (Fase 2) solo autoriza un canal
+  Core↔Secrets Broker, y ese canal no tiene ninguna implementación real en ningún sistema operativo
+  (`packages/core/src/transport/index.ts` y `packages/secrets-broker/src/transport/index.ts` son
+  placeholders vacíos, `export {}`, desde la Fase 2). `execution-ssh`'s `getSshKeySecret` ya es una
+  función inyectada sin implementación real de producción — solo mockeada en tests. **Decisión
+  explícita del usuario**: este bloqueo queda fuera de alcance de la Fase 11 — `connector-github`
+  recibe el secreto exactamente con el mismo patrón que `execution-ssh` (`getTokenSecret` inyectado
+  en `ExecuteDependencies`, sin implementación real de producción todavía), documentado como
+  limitación compartida y heredada por ambos backends, pendiente de una decisión futura (candidata
+  a Fase 13, Hardening, o una fase dedicada al canal real Execution↔Secrets Broker). No se amplía
+  ni se reabre DEC-010.
+
+## DEC-062 — Alcance funcional: operaciones GitHub con plantilla fija, nunca HTTP libre (Fase 11)
+
+- Fecha: 2026-09-17
+- Contexto: DEC-037 (Fase 7) exige que Execution nunca acepte comandos arbitrarios — solo
+  plantillas fijas con parámetros tipados sustituidos. El equivalente para un conector HTTP es:
+  nunca construir la URL/método/payload a partir de texto libre del agente.
+- Opciones consideradas: (A) un conjunto pequeño y fijo de operaciones GitHub declaradas
+  explícitamente en configuración, cada una con su propia plantilla de endpoint+método+forma de
+  payload — análogo directo a `CommandTemplate` (DEC-037); (B) un "passthrough" genérico que
+  permite al agente especificar método HTTP + path + body libremente.
+- Decisión: **(A)**. (B) violaría directamente el principio de DEC-037 trasladado al dominio HTTP
+  — equivalente a permitir shell arbitraria. Alcance mínimo viable de esta fase: 3 operaciones
+  (`create_issue`, `list_issues`, `comment_on_issue`), cada una una `GithubOperationTemplate` con
+  método HTTP fijo, path con placeholders `{{name}}` (sustituidos y percent-encoded, nunca
+  concatenados como texto libre) y `bodyFields` declarados explícitamente — nunca interpolación de
+  texto libre en la URL o el body. Config declarativa JSON propia
+  (`packages/connector-github/src/config/`), separada de `execution-ssh`.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: `resolveOperationTemplate()` (análogo a `resolveCommandTemplate`, DEC-037) lanza
+  si un placeholder de path o un `bodyField` declarado no tiene parámetro correspondiente, o si se
+  suministra un parámetro no referenciado por la plantilla — mismo discipline de "nunca silenciar
+  un desajuste template/parámetros" que DEC-037.
+
+## DEC-063 — Dependencia HTTP: `fetch` nativo de Node, sin librería nueva (Fase 11)
+
+- Fecha: 2026-09-17
+- Contexto: ninguna dependencia HTTP estaba instalada en el monorepo antes de esta fase. Node 18+
+  incluye `fetch` nativo (global, sin import).
+- Opciones consideradas: (A) `fetch` nativo — cero dependencias nuevas; (B) instalar
+  `undici`/`axios`/`node-fetch` — funcionalidad equivalente o menor, sin necesidad real; (C)
+  instalar `@octokit/rest` (SDK oficial de GitHub) — abstrae la API pero introduce una dependencia
+  de terceros con su propia superficie de confianza y menos control sobre qué datos se
+  envían/registran.
+- Decisión: **(A)**. Coherente con "no introduzcas dependencias innecesarias" (condición explícita
+  repetida en fases previas) y con el mismo criterio general que descartó SQLite en Fase 10 por
+  riesgo — aquí no hay riesgo de compilación nativa, pero sí el principio de minimizar superficie
+  de terceros. `fetch` nativo es suficiente para las 3 operaciones de alcance mínimo (DEC-062).
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: `packages/connector-github/package.json` solo depende de `@agentforge/shared`
+  (workspace) en `dependencies` — sin dependencias de runtime externas. Timeout implementado con
+  `AbortController` (análogo al timeout SSH de DEC-041), sin librería adicional.
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -1300,6 +1450,12 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 - ~~Minimización de datos en el Audit Log (Fase 10)~~ → DEC-055.
 - ~~Propagación conjunta de sessionId y operationId a Execution (Fase 10)~~ → DEC-056.
 - ~~Garantías de persistencia del Audit Log (Fase 10)~~ → DEC-057.
+- ~~Modelo general de Connectors: Execution Backend propio por conector (Fase 11)~~ → DEC-058.
+- ~~Reutilización del contrato IPC/Execution existente (Fase 11)~~ → DEC-059.
+- ~~Nueva variante ExecutionOutcome para resultados HTTP (Fase 11)~~ → DEC-060.
+- ~~Autenticación del conector: PAT vía SecretKind "token" (Fase 11)~~ → DEC-061.
+- ~~Alcance funcional: operaciones GitHub con plantilla fija (Fase 11)~~ → DEC-062.
+- ~~Dependencia HTTP: fetch nativo de Node (Fase 11)~~ → DEC-063.
 
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):
@@ -1320,3 +1476,10 @@ durante la Fase 2 o cuando corresponda):
 6. Implementación de la rama Linux/macOS del transporte IPC (DEC-010) — deliberadamente no
    implementada todavía; solo la interfaz agnóstica y la implementación Windows están previstas
    para cuando se cree el esqueleto.
+7. **Canal real Execution↔Secrets Broker en producción** (identificado durante Fase 11, DEC-061) —
+   DEC-010 solo autoriza y modela un canal Core↔Secrets Broker, sin implementación real en ningún
+   sistema operativo; ningún Execution Backend (`execution-ssh`, `connector-github`) tiene hoy una
+   forma real de obtener un secreto en producción — ambos usan una función inyectada sin
+   implementación real, solo mockeada en tests. No bloqueante para las fases ya cerradas ni para el
+   alcance de la Fase 11 (decisión explícita del usuario); candidato a resolverse en Fase 13
+   (Hardening) o en una fase dedicada.

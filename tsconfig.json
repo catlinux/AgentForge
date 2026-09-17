@@ -5,6 +5,7 @@
     { "path": "packages/core" },
     { "path": "packages/secrets-broker" },
     { "path": "packages/execution-ssh" },
+    { "path": "packages/connector-github" },
     { "path": "packages/mcp-server" }
   ]
 }
