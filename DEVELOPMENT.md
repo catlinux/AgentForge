@@ -233,8 +233,9 @@ ver `decisions/DECISIONS.md`.
   `main`/CLI real de producción — `startStdioServer`/`startExecutionServer`/`startConnectorServer`
   seguían siendo funciones de librería, nunca invocadas como proceso real fuera de test. El
   Dashboard de esta fase se verificó con fixtures generadas a mano, no con datos de una ejecución
-  real. **Resuelto en Fase 16** (ver más abajo) para los 4 procesos de backend — el Dashboard
-  sigue sin `main`/script de arranque propio en `package.json`, fuera de alcance de la Fase 16.
+  real. **Resuelto en Fase 16** para los 4 procesos de backend, y **en la tarea POST-F16** para el
+  Dashboard (`packages/dashboard/src/main.ts`, mismo patrón, puerto configurable vía
+  `AGENTFORGE_DASHBOARD_PORT`) — los 5 procesos tienen hoy un entrypoint real mínimo.
 
 **DECIDIDO (DEC-070 a DEC-071, Fase 13, 2026-09-17):** canal real Execution Backend↔Secrets Broker
 y revisión/DEC-036 — ver `decisions/DECISIONS.md`.
@@ -299,20 +300,39 @@ versionado, CI/CD, y traducción de documentos de arquitectura — ver `decision
   Cada uno expone también una función interna testeable, separada del `main()` de proceso.
 - **Fuera de alcance, sin cambios:** rama Linux/macOS de cualquier transporte; rotación de Audit
   Log; OAuth; multiusuario; nuevos conectores; instalador o gestión de servicio del sistema
-  operativo; `main`/script de arranque para `packages/dashboard` (sigue arrancándose solo vía
-  `startDashboard(port)` programáticamente o en test).
+  operativo.
+
+**POST-F16 — Puesta en marcha real en Windows (2026-09-17):** tarea práctica fuera de la
+numeración de fases, sin decisiones nuevas — ver `STATE.md` para el detalle completo.
+
+- **5º entrypoint:** `packages/dashboard/src/main.ts` — mismo patrón exacto que los 4 de Fase 16,
+  reutilizando `startDashboard(port)` tal cual (`packages/dashboard/src/server.ts`); puerto
+  configurable vía `AGENTFORGE_DASHBOARD_PORT` (por defecto `4173`), bind a `127.0.0.1` sigue fijo
+  dentro de `startDashboard` (DEC-068).
+- **Script `start` en los 5 `package.json` de proceso** (`secrets-broker`, `execution-ssh`,
+  `connector-github`, `mcp-server`, `dashboard`): `"start": "node dist/main.js"` — antes solo
+  tenían `build`/`typecheck`.
+- **Manual de usuario nuevo:** `docs/USER-GUIDE.md`/`docs/USER-GUIDE.en.md` — instalación,
+  configuración de cada componente (incluido un script de ejemplo para dar de alta secretos, ya
+  que no existe CLI de administración), arranque, conexión MCP con Claude Code, uso, Dashboard,
+  confirmación humana, Audit Log, troubleshooting y limitaciones. Ver sección siguiente.
 
 ## Cómo ejecutar el proyecto
 
-Desde la Fase 16, cada proceso de backend tiene un punto de entrada real mínimo. Tras
-`pnpm run build`, cada uno se arranca con `node dist/main.js` desde su carpeta (o
-`pnpm --filter <paquete> exec node dist/main.js` desde la raíz):
+Para el manual completo, paso a paso desde cero, ver `docs/USER-GUIDE.md` (español) o
+`docs/USER-GUIDE.en.md` (inglés). Resumen técnico:
+
+Cada uno de los 5 procesos tiene un punto de entrada real mínimo. Tras `pnpm run build`, cada uno
+se arranca con `node dist/main.js` desde su carpeta, o `pnpm --filter <paquete> run start` desde
+la raíz:
 
 1. `packages/secrets-broker` — crea/carga su clave maestra real y sirve el canal de DEC-070.
 2. `packages/execution-ssh` y/o `packages/connector-github` — cargan su configuración real
    (o arrancan con configuración vacía si el fichero todavía no existe) y sirven su canal IPC.
 3. `packages/mcp-server` — habla por stdio (DEC-046); pensado para ser lanzado por un cliente MCP
    (Claude Code u otro), no para ejecutarse directamente en una terminal interactiva.
+4. `packages/dashboard` (opcional, independiente del resto) — sirve en `127.0.0.1:4173` por
+   defecto.
 
 Todos leen/escriben bajo `AGENTFORGE_DATA_DIR` (por defecto `~/.agentforge`). Esto es un mínimo
 funcional — sigue sin existir instalador, gestión de servicio del sistema operativo, ni
@@ -320,15 +340,12 @@ empaquetado para distribución (ver `architecture/ARCHITECTURE.md` §20, punto 9
 
 Además:
 
-- `pnpm run test` — tests unitarios/aislados de los 8 paquetes, incluidos los 4 tests nuevos de
-  Fase 16 que ejercitan cada entrypoint real (arrancan el servidor real sobre un socket/pipe
-  temporal, sin mockear el wiring).
+- `pnpm run test` — tests unitarios/aislados de los 8 paquetes, incluidos los 5 tests que ejercitan
+  cada entrypoint real (arrancan el servidor real sobre un socket/pipe/puerto temporal, sin
+  mockear el wiring).
 - `pnpm run test:integration` — tests de integración real entre procesos (`tests/integration/`,
   Fase 14), que arrancan procesos reales del sistema operativo contra servidores SSH/HTTP
   simulados en loopback, nunca sistemas remotos reales.
-- `packages/dashboard`: `startDashboard(port)` (`packages/dashboard/src/server.ts`) arranca un
-  servidor real en `127.0.0.1:<port>` — sigue siendo la única pieza sin un `main.ts`/script de
-  arranque en `package.json`, fuera de alcance de la Fase 16.
 
 ## Cómo instalar dependencias
 

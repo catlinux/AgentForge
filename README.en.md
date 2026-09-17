@@ -117,16 +117,18 @@ is kept as a historical reference.
 
 ### How to start the real processes
 
-Since Phase 16, every process package has a minimal real entrypoint (`pnpm run build` first,
-then run each one with `node dist/main.js` from its folder, or `pnpm --filter <package> exec node
-dist/main.js` from the repo root). Recommended order — the operator starts each backend
-independently **before** confirmation-requiring tools become available over MCP (DEC-047):
+Every one of the 5 process packages has a minimal real entrypoint (`pnpm run build` first, then
+run each one with `pnpm --filter <package> run start` from the repo root, or `node dist/main.js`
+from its folder). Recommended order — the operator starts each backend independently **before**
+confirmation-requiring tools become available over MCP (DEC-047):
 
 1. `packages/secrets-broker` — Secrets Broker (creates its master key if it does not exist yet).
 2. `packages/execution-ssh` and/or `packages/connector-github` — Execution Backends (prompt for
    confirmation on the console when required, DEC-038).
 3. `packages/mcp-server` — MCP server (speaks over stdio, meant to be launched by Claude Code or
    another MCP client, not run directly in an interactive terminal).
+4. `packages/dashboard` (optional, independent of the rest) — read-only interface on
+   `127.0.0.1:4173` by default (port configurable via `AGENTFORGE_DASHBOARD_PORT`).
 
 All data/configuration files (keys, encrypted secrets, host/account configuration, Audit Log)
 live under `AGENTFORGE_DATA_DIR` (defaults to `~/.agentforge`) — without that configuration file
@@ -134,6 +136,11 @@ yet, each process still starts fine with an empty catalog/configuration, not an 
 functional minimum, not a production CLI with an installer, OS service management, or
 distribution packaging — that remains out of scope for 1.0 (see `architecture/ARCHITECTURE.md`
 §20, item 9).
+
+**Full setup guide:** `docs/USER-GUIDE.en.md` (and its Spanish equivalent,
+`docs/USER-GUIDE.md`) — installation, configuring every component, starting the processes,
+connecting to Claude Code over MCP, day-to-day use, the Dashboard, human confirmation, the Audit
+Log, troubleshooting, and current limitations, step by step from scratch.
 
 ## Core principles
 

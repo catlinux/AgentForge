@@ -1,14 +1,17 @@
 # STATE.md — AgentForge
 
-**Última actualización:** 2026-09-17 (Fase 16 — Stable Release, INSPECT+PLAN+EXECUTE completados,
-VERIFY completo pasa limpio — pendiente de presentar el resultado y de autorización explícita de
-`git commit`/`git push`)
+**Última actualización:** 2026-09-17 (POST-F16 — Puesta en marcha real en Windows, INSPECT+
+EXECUTE+VERIFY completados — pendiente de autorización explícita de `git commit`/`git push`)
 
-**Corrección sobre una afirmación desactualizada de esta misma sección:** el commit y push de la
-Fase 15 (`806badf`, "release 0.1.0") **ya están hechos** — detectado durante el INSPECT de la
-Fase 16 (`git status`: working tree limpio, `master` sincronizado con `origin/master`). La versión
-anterior de esta sección decía que seguían pendientes de autorización; no se volvió a actualizar
-tras ejecutarse. No se verificó la existencia de un tag `v0.1.0` (no comprobado explícitamente).
+**Fase 16 (Stable Release) ya commiteada y pusheada** — commit `2d7a354` en `origin/master`,
+working tree limpio, verificado tras el push. Ver sección "Fase 16" en "Trabajo completado" para
+el detalle completo.
+
+**POST-F16 — Puesta en marcha real en Windows (2026-09-17):** tarea práctica solicitada tras
+cerrar la Fase 16, fuera de la numeración de fases del roadmap — preparar AgentForge para
+instalación/uso real (no solo desarrollo) en un equipo Windows, conectado a Claude Code. Sin
+decisiones arquitectónicas nuevas ni reapertura de DEC-010 u otras decisiones cerradas. Detalle
+completo en la sección "POST-F16" de "Trabajo completado", más abajo.
 
 ## Proyecto
 
@@ -20,13 +23,21 @@ copiar).
 
 ## Fase actual
 
-**Fase 16 — Stable Release**
+**POST-F16 — Puesta en marcha real en Windows**
 
-**Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 1 decisión aprobada
-(DEC-080: cierre de DEC-010 —transporte IPC Core↔Secrets Broker— sin implementar, fuera de
-alcance de la 1.0, por no tener ningún consumidor real hoy). Ver sección "Fase 16" en "Trabajo
-completado" más abajo para el detalle completo, y `decisions/DECISIONS.md` para el registro
-formal de DEC-080.
+**Estado:** INSPECT + EXECUTE + VERIFY completados (2026-09-17) — sin decisiones nuevas, sin
+reapertura de DEC-010 ni de ninguna otra decisión cerrada. Ver sección "POST-F16" en "Trabajo
+completado" más abajo para el detalle completo.
+
+---
+
+**Fase 16 — Stable Release** (fase anterior, resumen conservado)
+
+**Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17), commiteada y pusheada
+(`2d7a354`) — 1 decisión aprobada (DEC-080: cierre de DEC-010 —transporte IPC Core↔Secrets
+Broker— sin implementar, fuera de alcance de la 1.0, por no tener ningún consumidor real hoy). Ver
+sección "Fase 16" en "Trabajo completado" más abajo para el detalle completo, y
+`decisions/DECISIONS.md` para el registro formal de DEC-080.
 
 ---
 
@@ -87,8 +98,8 @@ misma Fase 16, sección correspondiente más abajo).
 
 ## Microtarea actual
 
-Fase 16 con EXECUTE y VERIFY completos, pendiente de presentar el resultado al usuario y de
-autorización explícita de `git commit`/`git push` (todavía no concedidas para esta fase).
+POST-F16 (puesta en marcha real en Windows) con EXECUTE y VERIFY completos, pendiente de
+autorización explícita de `git commit`/`git push` (todavía no concedidas para esta tarea).
 
 ## Trabajo completado
 
@@ -1242,9 +1253,73 @@ existencia del tag `v0.1.0`.
       POSIX heredados de Fase 6, sin cambios), incluidos los 4 tests nuevos de entrypoints; `pnpm
       run build` correcto en los 8 paquetes; `pnpm run test:integration` — 4/4 correctos, sin
       cambios (los entrypoints nuevos no tocan el código que esos tests ejercitan). Ningún sistema
-      remoto real tocado; ningún cambio de visibilidad de GitHub ejecutado. Working tree pendiente
-      de revisión final por el usuario antes de `git commit`/`git push` (no autorizados todavía
-      para esta fase).
+      remoto real tocado; ningún cambio de visibilidad de GitHub ejecutado.
+- [x] **Commit y push autorizados y ejecutados** (2026-09-17): commit `2d7a354` ("feat+docs:
+      implementa Stable Release — Fase 16 (DEC-080)"), pusheado a `origin/master`. Verificado tras
+      el push: `HEAD` coincide con `origin/master`, working tree limpio.
+
+### POST-F16 — Puesta en marcha real en Windows (INSPECT + EXECUTE + VERIFY completados, 2026-09-17)
+- [x] **INSPECT** de los 4 entrypoints de Fase 16, formato exacto de cada fichero de configuración
+      (`host-config.json`, `account-config.json`, `registry-cache.json`, `discovery-config.json`,
+      `policy-config.json`), y de cómo el usuario llegaría de "código compilado" a "sistema
+      usable". Hallazgo relevante: **no existía ningún mecanismo para poblar el Tool Registry**
+      (`registry-cache.json`) fuera de tests — `resolveDiscoveredTool` (Fase 3, DEC-016) nunca se
+      invoca desde ningún `main.ts` real; en ausencia de servidores MCP de terceros que descubrir,
+      el catálogo de tools de AgentForge (Execution SSH, Connector GitHub) debe escribirse a mano.
+      No es un defecto de código — es la consecuencia esperada del alcance ya aprobado (Registry
+      declarativo + caché, DEC-014/DEC-015); se documenta en el manual, no se implementa ningún
+      "discovery runner" nuevo (fuera del alcance pedido). Segundo hallazgo: `packages/dashboard`
+      seguía sin `main.ts` (único de los 5 procesos que no lo tenía) pese a tener `startDashboard
+      (port)` real ya implementado desde la Fase 12 — mismo patrón exacto que los 4 entrypoints de
+      Fase 16, no una pieza nueva de arquitectura.
+- [x] Implementación — 1 entrypoint adicional, mismo patrón que Fase 16, sin lógica nueva:
+      `packages/dashboard/src/main.ts` (`startDashboard(resolvePort())`, puerto configurable vía
+      `AGENTFORGE_DASHBOARD_PORT`, por defecto 4173 — bind a `127.0.0.1` sigue fijado dentro de
+      `startDashboard` mismo, DEC-068, sin tocar). Test nuevo `packages/dashboard/src/main.test.ts`
+      (1 test, arranca el servidor real y comprueba el bind a `127.0.0.1`). Script `"start": "node
+      dist/main.js"` añadido a los `package.json` de los 5 paquetes de proceso
+      (`secrets-broker`, `execution-ssh`, `connector-github`, `mcp-server`, `dashboard`) — antes
+      solo tenían `build`/`typecheck`, sin forma estándar de arrancar el compilado.
+- [x] **Manual de usuario nuevo:** `docs/USER-GUIDE.md` (español, principal) y
+      `docs/USER-GUIDE.en.md` (inglés, contenido equivalente) — no existía ningún manual previo
+      (`grep` sobre `docs/` confirmó que solo había documentos de investigación de Fase 0, en
+      catalán). 19 secciones cubriendo exactamente lo pedido: requisitos, instalación,
+      `AGENTFORGE_DATA_DIR`, Secrets Broker (incluye un script de ejemplo `seed-secret.mjs` para
+      dar de alta credenciales, verificado realmente ejecutándolo — ver VERIFY), hosts SSH,
+      conector GitHub, Tool Registry (con el JSON completo de ejemplo, incluyendo la advertencia de
+      que hoy se edita a mano), Discovery, Policy Engine, orden de arranque de los 5 procesos,
+      conexión con Claude Code vía `claude mcp add`, verificación end-to-end, uso de las tools,
+      Dashboard, confirmación humana (con el texto exacto del prompt de `ReadlineConfirmationChannel`),
+      Audit Log, parada/reinicio, tabla de troubleshooting (8 síntomas con causa y solución, cada
+      uno verificado contra el código real, no inventado), y limitaciones actuales/Windows-only.
+      Referenciado desde `README.md`/`README.en.md`.
+- [x] **Corrección real detectada durante el propio VERIFY del manual:** el primer borrador del
+      script `seed-secret.mjs` importaba `@agentforge/secrets-broker` por nombre de paquete —
+      probado literalmente (`node seed-secret.mjs` desde la raíz del repo) y falló con
+      `ERR_MODULE_NOT_FOUND`, porque ese paquete no tiene un symlink de workspace resoluble desde
+      un script suelto fuera de los paquetes del monorepo (pnpm aísla `node_modules` por paquete).
+      Corregido a un import relativo directo (`./packages/secrets-broker/dist/index.js`),
+      re-probado con éxito (crea un `SecretId` real). Ambas versiones del manual corregidas antes
+      de darlas por buenas — ningún comando del manual quedó sin probar.
+- [x] Alcance respetado: no se implementó ningún descubrimiento automático de tools; no se creó
+      CLI de administración de secretos (el script del manual es un ejemplo documentado, no código
+      nuevo del repositorio); no se tocó DEC-010 ni ninguna otra decisión cerrada; no se añadieron
+      operaciones nuevas al conector GitHub; no se ejecutó ningún comando contra sistemas remotos
+      reales ni se usaron credenciales reales — la prueba del script de secretos usó un valor
+      ficticio (`"fake-key-content"`) en un directorio temporal, eliminado después.
+- [x] **Verificado (además de lo listado arriba):** `pnpm run typecheck`/`lint`/`format` limpios
+      tras añadir `dashboard/src/main.ts`; `pnpm run test` — 255/257 correctos (2 skip POSIX
+      heredados, sin cambios), incluido el test nuevo del dashboard; `pnpm run build` correcto en
+      los 8 paquetes; `pnpm run test:integration` — 4/4 correctos, sin cambios. Arranque real
+      manual (no solo tests) de los 5 entrypoints en Windows: Secrets Broker (crea `master.key`
+      real), Execution SSH (escucha en su named pipe real, verificado con una conexión de prueba),
+      Connector GitHub (ídem), MCP Server (responde `tools/list` real por stdout con un único frame
+      JSON-RPC, stderr vacío — DEC-046 verificado en ejecución real, no solo por test estático),
+      Dashboard (`GET /api/audit` y `GET /` responden 200 reales vía `curl`). Comando documentado
+      `pnpm --filter <paquete> run start` verificado literalmente, no solo `node dist/main.js`.
+      Todos los directorios temporales de prueba eliminados al terminar; un proceso Node residual
+      de una prueba manual anterior (identificado por `StartTime`, no confundido con procesos
+      ajenos a esta sesión) fue detenido explícitamente antes de continuar.
 
 ## Documentación sincronizada
 

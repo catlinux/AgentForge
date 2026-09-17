@@ -118,17 +118,19 @@ se conserva como referencia histórica.
 
 ### Cómo arrancar los procesos reales
 
-Desde la Fase 16 cada paquete de proceso tiene un punto de entrada mínimo real (`pnpm run build`
-primero, luego cada uno con `node dist/main.js` desde su carpeta, o `pnpm --filter <paquete> exec
-node dist/main.js` desde la raíz). Orden recomendado — el operador arranca cada backend de forma
-independiente **antes** de que las tools que requieren confirmación humana estén disponibles vía
-MCP (DEC-047):
+Cada uno de los 5 paquetes de proceso tiene un punto de entrada mínimo real (`pnpm run build`
+primero, luego cada uno con `pnpm --filter <paquete> run start` desde la raíz, o `node
+dist/main.js` desde la carpeta del paquete). Orden recomendado — el operador arranca cada backend
+de forma independiente **antes** de que las tools que requieren confirmación humana estén
+disponibles vía MCP (DEC-047):
 
 1. `packages/secrets-broker` — Secrets Broker (crea su clave maestra si no existe).
 2. `packages/execution-ssh` y/o `packages/connector-github` — Execution Backends (piden
    confirmación por consola cuando corresponde, DEC-038).
 3. `packages/mcp-server` — servidor MCP (habla por stdio, pensado para ser lanzado por Claude
    Code u otro cliente MCP, no directamente en una terminal interactiva).
+4. `packages/dashboard` (opcional, independiente del resto) — interfaz de solo lectura en
+   `127.0.0.1:4173` por defecto (puerto configurable vía `AGENTFORGE_DASHBOARD_PORT`).
 
 Todos los ficheros de datos/configuración (claves, secretos cifrados, configuración de hosts/
 cuentas, Audit Log) viven bajo `AGENTFORGE_DATA_DIR` (por defecto `~/.agentforge`) — sin ese
@@ -136,6 +138,11 @@ fichero de configuración todavía, cada proceso arranca igualmente con un catá
 vacíos, no con un error. Esto es un mínimo funcional, no una CLI de producción con instalador,
 gestión de servicios del sistema operativo, ni empaquetado para distribución — eso sigue fuera de
 alcance de la 1.0 (ver `architecture/ARCHITECTURE.md` §20, punto 9).
+
+**Manual completo de puesta en marcha:** `docs/USER-GUIDE.md` (y su equivalente en inglés,
+`docs/USER-GUIDE.en.md`) — instalación, configuración de cada componente, arranque, conexión con
+Claude Code vía MCP, uso, Dashboard, confirmación humana, Audit Log, troubleshooting y
+limitaciones actuales, paso a paso desde cero.
 
 ## Principios principales
 
