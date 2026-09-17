@@ -186,9 +186,12 @@ const sshKeyId = await store.create(
 console.log("SecretId de la clave SSH:", sshKeyId);
 
 // Ejemplo: Personal Access Token de GitHub (kind "token")
+// Sustituye "github_pat_xxxx" por el token real que copiaste en la sección 1 (paso 7) —
+// empieza por "github_pat_" si es un Fine-grained token, el único tipo que este manual explica
+// cómo crear. Pégalo aquí, entre comillas, tal cual lo copiaste, sin espacios ni saltos de línea.
 const tokenId = await store.create(
   "token",
-  { value: "ghp_xxx..." },
+  { value: "github_pat_xxxx" },
   "github",
   "PAT de GitHub para mi cuenta",
 );
