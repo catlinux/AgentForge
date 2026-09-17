@@ -12,21 +12,27 @@ copiar).
 
 ## Fase actual
 
-**Fase 7 — Ejecución remota / SSH**
+**Fase 8 — Integración MCP**
 
-**Estado:** COMPLETADA (2026-09-17) — 6 decisiones aprobadas (DEC-037 a DEC-042: comandos con
-plantilla fija por tool, confirmación humana síncrona propia de Execution con hash determinista/
-un solo uso/timeout/rechazo por defecto tras descartar los hooks de Claude Code por verificación
-técnica, configuración de hosts en JSON propio, límites de stdout/stderr sin loguear contenido,
-timeout de conexión SSH con cierre forzado, y paquete propio `packages/execution-ssh`).
-Implementación completa con tests de seguridad. Ver `decisions/DECISIONS.md` para el registro
-formal.
+**Estado:** COMPLETADA (2026-09-17) — 5 decisiones aprobadas (DEC-043 a DEC-047: servidor MCP
+único agnóstico del backend, paquete propio `packages/mcp-server`, confirmación humana durante
+`tools/call` mediante progreso periódico + gestión explícita de cancelación con guard de estado
+atómico sobre `OperationHash` — ampliando DEC-038 sin modificarla —, transporte stdio, y
+**servidor MCP y Execution como procesos separados** comunicados por un canal del mismo patrón de
+DEC-010 con contrato de dominio propio). Implementación completa con tests de seguridad,
+incluyendo las condiciones de carrera de cancelación/aprobación. Ver `decisions/DECISIONS.md`
+para el registro formal.
 
-**Implementación:** Execution SSH funcional — plantillas de comando, confirmación humana con
-`ConfirmationChannel`/`ReadlineConfirmationChannel`, cliente SSH (`ssh2`) con timeout y
-truncado de salida, orquestador que consume `PolicyDecision` (Fase 5) y `SecretRecord` de
-`kind: "ssh-key"` (Fase 6) — **ningún sistema remoto real tocado**, tests con SSH mockeado.
-Fases 3 a 6 siguen vigentes y sin cambios.
+**Implementación:** servidor MCP funcional (`@modelcontextprotocol/sdk` oficial, transporte
+stdio) — `tools/list` traducido desde Discovery, `tools/call` con progreso/cancelación
+gestionados explícitamente, cliente IPC (`NetExecutionChannelClient`) hacia el proceso Execution
+separado, servidor IPC en Execution (`startExecutionServer`) que expone `execute()` sin bypassear
+Policy Engine. `OperationHashRegistry` (extensión de DEC-038) con tres estados (pendiente/usado/
+cancelado) para resolver de forma determinista la carrera cancelación/aprobación. **Ningún
+sistema remoto real tocado**, ningún despliegue externo — tests con IPC real en memoria (sockets
+de test) y SSH mockeado. Fases 3 a 7 siguen vigentes y sin cambios estructurales (solo
+`confirm.ts`/`execute.ts` de Fase 7 ampliados para aceptar el registro de 3 estados, sin cambiar
+sus garantías ya aprobadas).
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
@@ -35,13 +41,14 @@ APROBADA (Fase 2: DEC-008 a DEC-012) + TOOL REGISTRY APROBADO E IMPLEMENTADO (Fa
 DEC-017) + TOOL DISCOVERY APROBADO E IMPLEMENTADO (Fase 4: DEC-018 a DEC-022) + POLICY ENGINE
 APROBADO E IMPLEMENTADO (Fase 5: DEC-023 a DEC-029) + SECRETS BROKER APROBADO E IMPLEMENTADO
 (Fase 6: DEC-030 a DEC-036) + EJECUCIÓN REMOTA/SSH APROBADA E IMPLEMENTADA (Fase 7: DEC-037 a
-DEC-042). Resto documentado como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
+DEC-042) + INTEGRACIÓN MCP APROBADA E IMPLEMENTADA (Fase 8: DEC-043 a DEC-047). Resto documentado
+como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 7 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
-tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 8
-(Integración MCP) — sin implementar nada todavía.
+Fase 8 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
+tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 9 (Sessions)
+— sin implementar nada todavía.
 
 ## Trabajo completado
 
@@ -514,6 +521,90 @@ decisión automática.
       correctos. `git diff`/`git status` revisados de nuevo: sin referencias a hosts reales del
       proyecto, ningún test abre conexión SSH real.
 
+### Fase 8 — Integración MCP (completada, 2026-09-17)
+- [x] Análisis completo presentado en una única respuesta (objetivo, arquitectura/flujo, la
+      pregunta central MCP vs. hooks vs. combinación analizada en detalle como propuesta —no como
+      decisión de antemano—, decisiones con alternativas/impacto, límites, riesgos, tests
+      previstos, lista final de aprobación).
+- [x] Dos rondas de verificación técnica y concreción adicional a petición del usuario antes de
+      aprobar 8-C/8-E: (1) verificado con el SDK MCP real y documentación oficial que bloquear
+      `tools/call` sin más no es sólido frente a los timeouts reales de Claude Code — requiere
+      `notifications/progress` periódico; (2) verificado que `ReadlineConfirmationChannel` sobre
+      stdin/stdout del servidor MCP es un conflicto técnico real y duro con el transporte stdio
+      (DEC-046) — motivó la separación de procesos de DEC-047; (3) concreción de la topología E1b
+      (Execution arrancado independientemente por el operador, canal IPC del patrón de DEC-010
+      con contrato de dominio propio) y sus casos de fallo (Execution caído, socket ocupado,
+      conexión perdida, reinicio) — todos fail-closed; (4) concreción exacta del guard de estado
+      atómico sobre `OperationHash` para resolver la carrera cancelación/aprobación, y del límite
+      preciso entre "cancelar antes de confirmar" (deniega) y "cancelar después de confirmar"
+      (no aborta la ejecución SSH ya comprometida, solo afecta a la entrega del resultado).
+- [x] **DEC-043** — Un único servidor MCP, agnóstico del backend de ejecución vía Discovery.
+- [x] **DEC-044** — Ubicación: `packages/mcp-server`, paquete propio (patrón de DEC-008).
+- [x] **DEC-045** — Confirmación durante `tools/call`: progreso periódico + gestión explícita de
+      `notifications/cancelled`, guard de estado atómico sobre `OperationHash`, cancelación antes
+      de confirmación = denegación, cancelación después de confirmación aprobada no aborta la
+      ejecución SSH en curso (solo afecta a la entrega del resultado MCP) — amplía DEC-038 sin
+      modificarla.
+- [x] **DEC-046** — Transporte stdio; ningún contenido no-MCP se escribe jamás en stdout del
+      servidor.
+- [x] **DEC-047** — Servidor MCP y Execution como procesos separados (variante E1b: Execution
+      arrancado independientemente por el operador); canal IPC del mismo patrón de transporte de
+      DEC-010 con contrato de dominio propio (nunca reutilizando `SecretsBrokerTransport`);
+      fail-closed uniforme ante cualquier fallo/ambigüedad del canal; una única instancia de cada
+      en esta fase, sin discovery multi-instancia (límite documentado explícitamente).
+- [x] `decisions/DECISIONS.md`, `STATE.md`, `ROADMAP.md`, `DEVELOPMENT.md`,
+      `architecture/ARCHITECTURE.md`/`.en.md` (§1, §10, §20) sincronizados con DEC-043 a DEC-047,
+      resolviendo la pregunta abierta de secuenciación MCP/hooks heredada de Fase 1.
+- [x] Implementación: `packages/shared/src/mcp/` — `execution-channel.ts` (contrato de dominio
+      `ExecutionChannelRequest`/`ExecutionChannelResponse`/`ExecutionChannelClient`, distinto de
+      `SecretsBrokerTransport`). `packages/execution-ssh/src/confirmation/` — `hash-registry.ts`
+      (`OperationHashRegistry`, 3 estados: pendiente/usado/cancelado, guard atómico sin `await`
+      entre comprobación y transición), `cancel.ts` (`cancelOperation`, mismo hash determinista
+      que `confirmOperation`); `confirm.ts`/`execute.ts` ampliados para usar el registro de 3
+      estados (sin cambiar sus garantías ya aprobadas de DEC-038). `packages/execution-ssh/src/ipc/`
+      — `pipe-path.ts` (canal de nombre fijo, named pipe/Unix socket según plataforma),
+      `execution-server.ts` (servidor IPC: enruta `execute`/`cancel`, nunca bypassea Policy
+      Engine, fail-closed en cualquier error). `packages/mcp-server/` (paquete nuevo) —
+      `tools-list.ts` (traduce Discovery→MCP), `tools-call.ts` (`handleToolCall`: progreso,
+      cancelación con comprobación previa a la petición para evitar una carrera de
+      `Promise.race`, nunca reenvía texto libre), `execution-client.ts`
+      (`NetExecutionChannelClient`, fail-closed en toda ambigüedad de conexión), `server.ts`
+      (ensamblaje con `@modelcontextprotocol/sdk` oficial, `Server` de bajo nivel para exponer
+      JSON Schema de Discovery directamente sin capa Zod).
+- [x] Nueva dependencia de producción: `@modelcontextprotocol/sdk` (oficial, Tier 1, ya
+      identificado en `TECH-STACK-ANALYSIS.md`) — no es una decisión nueva, aplicación de
+      investigación ya hecha.
+- [x] Tests (Vitest): 31 nuevos — 6 de `OperationHashRegistry` (transiciones de estado, no
+      persistencia); 4 nuevos en `confirm.test.ts` cubriendo explícitamente cancelación antes de
+      confirmación, aprobación después de cancelación, la carrera cancelación/aprobación
+      simulada, y cancelación después de aprobación (no invalida retroactivamente); 3 de
+      `execution-server.ts` (mensaje malformado, `deny` nunca toca Secrets Broker, cancelación
+      propagada); 6 de `NetExecutionChannelClient` (Execution no disponible, request antes de
+      connect, ronda completa, conexión perdida a media operación, respuesta malformada,
+      reinicio de Execution simulado con reconexión); 8 de `handleToolCall` (tool desconocida,
+      éxito, progreso periódico emitido y detenido correctamente, cancelación antes de respuesta
+      con propagación de `cancel()`, señal ya abortada corta sin llamar a `request()`, fallo de
+      IPC surge como error, parámetros nunca reescritos); 2 de verificación estática de que
+      ningún fichero de `mcp-server` usa `console.*`/`process.stdout`/`process.stdin`
+      directamente (DEC-046).
+- [x] Alcance respetado: no se implementaron hooks de Claude Code (documentados como extensión
+      futura posible); ningún sistema remoto real tocado, ningún despliegue externo; no se
+      reabrió DEC-003, DEC-005, DEC-006, DEC-010, DEC-029, DEC-031, DEC-036, ni ninguna decisión
+      de Fases 1-7; `confirm.ts`/`execute.ts` se ampliaron, no se rediseñaron.
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 5 paquetes (tras 3 correcciones de
+      tipado — anotaciones de retorno en mocks de test); `pnpm run lint` sin errores (tras
+      eliminar un import no usado); `pnpm run format` correcto (tras `--write` sobre 3 ficheros);
+      `pnpm run test` — 132/134 correctos (2 tests de permisos POSIX omitidos en Windows,
+      heredados de Fase 6) (31 nuevos + 103 previos), tras corregir una condición de carrera real
+      en `handleToolCall` (`Promise.race` no garantizaba que una señal ya abortada ganara frente
+      a una petición mockeada resuelta en el mismo tick — corregido comprobando `cancelled.aborted`
+      explícitamente antes de emitir la petición, no solo como parte de la carrera); `pnpm run
+      build` correcto en los 5 paquetes; `pnpm install --frozen-lockfile` correcto; grep de
+      secretos hardcodeados, hosts reales del proyecto, y `console.*` fuera de lo ya permitido —
+      sin coincidencias; `dist/`/`node_modules/`/`*.tsbuildinfo` correctamente ignorados; `git
+      diff` confirma que Registry, Discovery, Policy Engine, Secrets Broker, y las plantillas de
+      comando/cliente SSH de Fase 7 no fueron tocados — solo `confirm.ts`/`execute.ts` ampliados.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -589,6 +680,13 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-040** — Límites de stdout/stderr, nunca logueados en claro.
 - **DEC-041** — Timeout de conexión SSH, cierre forzado al expirar.
 - **DEC-042** — Ubicación: `packages/execution-ssh`, paquete propio.
+- **DEC-043** — Un único servidor MCP, agnóstico del backend de ejecución.
+- **DEC-044** — Ubicación: `packages/mcp-server`, paquete propio.
+- **DEC-045** — Confirmación durante `tools/call`: progreso periódico + cancelación explícita,
+  guard de estado atómico sobre `OperationHash` — amplía DEC-038 sin modificarla.
+- **DEC-046** — Transporte stdio, ningún contenido no-MCP en stdout del servidor.
+- **DEC-047** — Servidor MCP y Execution como procesos separados, canal IPC del patrón de
+  DEC-010 con contrato de dominio propio, fail-closed uniforme.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -680,38 +778,40 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `b48670d480721f0bf6ea97efac74a4b54311d093` (corto: `b48670d`)
+- Hash: `86571b71c03104a6d72c46aa3106c7bea15ad02d` (corto: `86571b7`)
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `feat+docs: implementa el Secrets Broker — Fase 6 (DEC-030 a DEC-036)`
-- Contenido: 22 archivos, 1.103 inserciones/47 eliminaciones — modelo
-  `SecretId`/`SecretRecord`/API de operaciones en `packages/shared/src/secrets/`;
-  cifrado/clave-maestra/store/manejador de operaciones en `packages/secrets-broker/src/` con 29
-  tests nuevos (68 en total); `DEVELOPMENT.md`, `ROADMAP.md`, `STATE.md`,
-  `architecture/ARCHITECTURE.md`/`.en.md`, `decisions/DECISIONS.md` (actualizados con DEC-030 a
-  DEC-036).
-- Commits anteriores: `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053` (Fase 3), `4e01064`
-  (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
+- Mensaje: `feat+docs: implementa Ejecución remota/SSH — Fase 7 (DEC-037 a DEC-042)`
+- Contenido: 31 archivos, 1.411 inserciones/44 eliminaciones — modelo
+  `ExecutionRequest`/`ExecutionOutcome` en `packages/shared/src/execution/`; plantillas de
+  comando, confirmación humana (`ConfirmationChannel`/`ReadlineConfirmationChannel`), cliente SSH
+  con timeout/truncado, orquestador en `packages/execution-ssh/` (paquete nuevo) con 35 tests
+  nuevos (103 en total); incluye la corrección de seguridad de `shell-quote.ts` encontrada en
+  revisión final; `DEVELOPMENT.md`, `ROADMAP.md`, `STATE.md`, `architecture/ARCHITECTURE.md`/
+  `.en.md`, `decisions/DECISIONS.md` (actualizados con DEC-037 a DEC-042).
+- Commits anteriores: `b48670d` (Fase 6), `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053`
+  (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef`
+  (Fase 0 + Fase 0.5).
 
 ## Estado del push
 
-- **Realizado** (2026-09-16, con autorización explícita del usuario). `master` sincronizado con
-  `origin/master` (`b48670d`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
+- **Realizado** (2026-09-17, con autorización explícita del usuario). `master` sincronizado con
+  `origin/master` (`86571b7`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
   al mismo hash).
 
 ## Próxima acción recomendada
 
-1. Pedir autorización explícita para el commit+push de los cambios de la Fase 7 (DEC-037 a
-   DEC-042, implementación de Execution SSH, documentación sincronizada). **Pendiente: el usuario
-   pidió explícitamente NO hacer commit ni push en este ciclo de EXECUTE/VERIFY** — requiere una
-   autorización separada posterior.
+1. Pedir autorización explícita para el commit+push de los cambios de la Fase 8 (DEC-043 a
+   DEC-047, implementación del servidor MCP y del canal IPC MCP↔Execution, documentación
+   sincronizada).
 2. Tras el commit/push, presentar únicamente el resumen de objetivos y decisiones a analizar de la
-   Fase 8 (Integración MCP) — sin implementar nada de esa fase todavía.
+   Fase 9 (Sessions) — sin implementar nada de esa fase todavía.
 3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
-   `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`; el transporte IPC real
-   (named pipe/Unix socket, DEC-010) sigue sin implementar; el usuario de sistema dedicado en cada
-   host remoto (`ARCHITECTURE.md` §9 OPEN QUESTION) sigue sin resolver — no se puede implementar
-   sin tocar esos sistemas, prohibido hasta autorización explícita.
+   `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`; el transporte IPC real Core↔Secrets
+   Broker (DEC-010) sigue sin implementar (distinto del canal MCP↔Execution de DEC-047, ya
+   implementado); el usuario de sistema dedicado en cada host remoto (`ARCHITECTURE.md` §9 OPEN
+   QUESTION) sigue sin resolver — no se puede implementar sin tocar esos sistemas, prohibido hasta
+   autorización explícita.
 
 ## Cómo reprender este trabajo
 

@@ -18,7 +18,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 5 | Permission / Policy Engine | **En curso** — 7 decisiones aprobadas (DEC-023 a DEC-029, incluye DEC-023b) |
 | 6 | Secrets Broker | **En curso** — 7 decisiones aprobadas (DEC-030 a DEC-036) |
 | 7 | Ejecución remota / SSH | **En curso** — 6 decisiones aprobadas (DEC-037 a DEC-042) |
-| 8 | Integración MCP | Propuesta, no iniciada |
+| 8 | Integración MCP | **En curso** — 5 decisiones aprobadas (DEC-043 a DEC-047) |
 | 9 | Sessions | Propuesta, no iniciada |
 | 10 | Audit Log | Propuesta, no iniciada |
 | 11 | Connectors | Propuesta, no iniciada |
@@ -105,7 +105,14 @@ de ellas.
   confirmación humana); configuración de hosts en JSON propio; límites de stdout/stderr sin
   loguear contenido; timeout de conexión SSH con cierre forzado; paquete propio
   `packages/execution-ssh` (patrón ya reservado por DEC-008).
-- **Fase 8 — Integración MCP**: servidor(es) MCP propio(s) y/o hooks de Claude Code.
+- **Fase 8 — Integración MCP**: servidor(es) MCP propio(s) y/o hooks de Claude Code. 5 decisiones
+  aprobadas (DEC-043 a DEC-047, ver `decisions/DECISIONS.md`): un único servidor MCP (agnóstico de
+  backend, vía Discovery), paquete propio `packages/mcp-server`, confirmación humana durante
+  `tools/call` mediante progreso periódico + gestión explícita de cancelación (DEC-045, amplía
+  DEC-038 sin modificarla), transporte stdio, y servidor MCP/Execution como **procesos separados**
+  comunicados por un canal del mismo patrón de DEC-010 (DEC-047) — precisamente porque stdio ocupa
+  stdin/stdout del servidor MCP, en conflicto directo con `ReadlineConfirmationChannel`. Hooks de
+  Claude Code quedan documentados como extensión futura posible, no implementados en esta fase.
 - **Fase 9 — Sessions**: gestión de sesiones de agente (identidad + herramientas + estado).
 - **Fase 10 — Audit Log**: registro centralizado y consultable de todas las acciones.
 - **Fase 11 — Connectors**: integraciones concretas con servicios externos (GitHub, Dropbox, etc.),

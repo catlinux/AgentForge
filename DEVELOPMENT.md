@@ -135,6 +135,25 @@ configuración de hosts, límites de salida, timeout SSH, y ubicación de Execut
 - **Conexión SSH:** timeout configurable, cierre forzado al expirar (DEC-041).
 - **Ubicación:** `packages/execution-ssh`, paquete propio (DEC-042).
 
+**DECIDIDO (DEC-043 a DEC-047, Fase 8, 2026-09-17):** número/ubicación del servidor MCP,
+confirmación durante `tools/call`, transporte, y separación de procesos MCP↔Execution — ver
+`decisions/DECISIONS.md`.
+
+- **Servidor MCP:** único, agnóstico del backend de ejecución vía Discovery; paquete propio
+  `packages/mcp-server` (DEC-043, DEC-044).
+- **Confirmación durante `tools/call`:** progreso periódico (`notifications/progress`) mientras
+  `confirmOperation()` (DEC-038) está pendiente; gestión explícita de `notifications/cancelled`
+  con guard de estado atómico sobre `OperationHash` para la carrera cancelación/aprobación;
+  cancelación tras confirmación aprobada no aborta la ejecución SSH ya comprometida, solo afecta a
+  la entrega del resultado (DEC-045).
+- **Transporte:** stdio local con Claude Code; ningún contenido no-MCP se escribe en stdout del
+  servidor (DEC-046).
+- **Procesos:** servidor MCP y Execution corren **separados** — Execution se arranca
+  independientemente por el operador; comunicados por un canal del mismo patrón de transporte de
+  DEC-010 (nueva interfaz de dominio, sin modificar `SecretsBrokerTransport`); fail-closed ante
+  cualquier fallo/ambigüedad del canal; una única instancia de cada en esta fase, sin discovery
+  multi-instancia (DEC-047).
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando

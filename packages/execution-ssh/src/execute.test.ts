@@ -11,7 +11,7 @@ import type {
   ConfirmationChannel,
   ConfirmationResponse,
 } from "./confirmation/confirmation-channel.js";
-import type { OperationHash } from "./confirmation/operation-hash.js";
+import { OperationHashRegistry } from "./confirmation/hash-registry.js";
 import type { CommandTemplate } from "./config/command-template.js";
 import type { ExecutionConfig, HostEntry } from "./config/host-config.js";
 
@@ -69,7 +69,7 @@ function makeDeps(response: ConfirmationResponse) {
   return {
     config,
     confirmationChannel: channel,
-    usedConfirmationHashes: new Set<OperationHash>(),
+    confirmationRegistry: new OperationHashRegistry(),
     confirmationTimeoutMs: 1000,
     sshTimeoutMs: 1000,
     getSshKeySecret: vi.fn(async () => sshKeySecret),

@@ -402,7 +402,23 @@ roadmap is authorized.
 **DECISION (DEC-005):** **Modern-only** scope — AgentForge's own MCP servers/clients target
 exclusively the `2026-07-28` specification.
 
-**PROPOSAL built on this:**
+**DECISION (DEC-043 to DEC-047, Phase 8):** the MCP server's count and location, human
+confirmation during `tools/call`, transport, and process separation are already decided — see
+`decisions/DECISIONS.md`. Summary: a **single MCP server** (`packages/mcp-server`), agnostic of
+the execution backend, consuming the already-built Discovery/Policy Engine/Execution without
+reimplementing them; **stdio** transport with Claude Code, never writing non-MCP content to
+stdout; human confirmation during `tools/call` via periodic progress
+(`notifications/progress`) and explicit `notifications/cancelled` handling, extending DEC-038
+without modifying it; and, crucially, **the MCP server and the Execution process run as separate
+processes** (DEC-047) — the operator starts Execution independently, connected to the MCP server
+over a channel following DEC-010's transport pattern (a new domain interface, without modifying
+`SecretsBrokerTransport`) — precisely because stdio occupies the MCP server's stdin/stdout, in
+direct conflict with `ReadlineConfirmationChannel` (DEC-038). This process-separation design
+resolves §1's open sequencing question: MCP as the primary discovery/invocation mechanism in this
+phase; Claude Code hooks remain a documented, possible future cross-cutting extension, not
+implemented.
+
+**PROPOSAL (historical context, Phase 1 — see DEC-043 to DEC-047 above for what is now decided):**
 
 - No central dependency is built on **sampling** or **roots** (both deprecated in the current
   specification — `docs/research/MCP-ANALYSIS.md` §3).
@@ -418,7 +434,8 @@ exclusively the `2026-07-28` specification.
   *federate* existing third-party MCP servers (IBM ContextForge's "virtual MCP servers" pattern,
   `docs/en/research/RELATED-PROJECTS.md`) — to be reviewed case by case, not now.
 
-**OPEN QUESTION:** none blocking — DEC-005 closes this section's main question for phase 1.
+~~**OPEN QUESTION:** none blocking — DEC-005 closes this section's main question for phase 1.~~ —
+**Phase 8 (DEC-043 to DEC-047) resolves the remaining implementation questions.**
 
 ---
 
@@ -621,8 +638,9 @@ implementation decision now.
 
 ### OPEN QUESTIONS remaining (not blocking closing Phase 1, to be resolved in later phases or
 during implementation)
-1. Exact sequencing: start with own MCP and add cross-cutting hooks later, or both from the
-   start? (§1)
+1. ~~Exact sequencing: start with own MCP and add cross-cutting hooks later, or both from the
+   start? (§1)~~ — **resolved in Phase 8, see DEC-043 to DEC-047**: own MCP as the primary
+   mechanism; hooks remain a possible future extension, not implemented.
 2. ~~Synchronous human confirmation mechanism: native to Claude Code or AgentForge's own
    interface?~~ — **resolved in Phase 7, see DEC-038**: Execution's own interface — Claude Code
    hooks were ruled out after explicit technical verification.

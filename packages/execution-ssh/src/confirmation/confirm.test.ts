@@ -6,7 +6,8 @@ import type {
   ConfirmationResponse,
 } from "./confirmation-channel.js";
 import { confirmOperation, type ConfirmationRequest } from "./confirm.js";
-import type { OperationHash } from "./operation-hash.js";
+import { OperationHashRegistry } from "./hash-registry.js";
+import { cancelOperation } from "./cancel.js";
 
 class ScriptedChannel implements ConfirmationChannel {
   public readonly promptsSeen: ConfirmationPrompt[] = [];
@@ -32,68 +33,153 @@ function makeRequest(overrides: Partial<ConfirmationRequest> = {}): Confirmation
 describe("confirmOperation (DEC-038)", () => {
   it("approved: returns confirmed and marks the hash as used", async () => {
     const channel = new ScriptedChannel({ kind: "approved" });
-    const used = new Set<OperationHash>();
-    const result = await confirmOperation(makeRequest(), channel, used, 1000);
+    const registry = new OperationHashRegistry();
+    const { outcome, operationHash } = await confirmOperation(
+      makeRequest(),
+      channel,
+      registry,
+      1000,
+    );
 
-    expect(result).toEqual({ confirmed: true });
-    expect(used.size).toBe(1);
+    expect(outcome).toEqual({ confirmed: true });
+    expect(registry.get(operationHash)).toBe("used");
   });
 
   it("guarantee 2 (single use): a second attempt with the exact same tuple is refused", async () => {
     const channel = new ScriptedChannel({ kind: "approved" });
-    const used = new Set<OperationHash>();
-    const first = await confirmOperation(makeRequest(), channel, used, 1000);
-    expect(first.confirmed).toBe(true);
+    const registry = new OperationHashRegistry();
+    const first = await confirmOperation(makeRequest(), channel, registry, 1000);
+    expect(first.outcome.confirmed).toBe(true);
 
-    const second = await confirmOperation(makeRequest(), channel, used, 1000);
-    expect(second).toEqual({ confirmed: false, reason: "already-used" });
+    const second = await confirmOperation(makeRequest(), channel, registry, 1000);
+    expect(second.outcome).toEqual({ confirmed: false, reason: "already-used" });
   });
 
   it("a different operation (different parameters) is NOT blocked by a prior approval", async () => {
     const channel = new ScriptedChannel({ kind: "approved" });
-    const used = new Set<OperationHash>();
-    await confirmOperation(makeRequest({ parameters: { path: "/a" } }), channel, used, 1000);
+    const registry = new OperationHashRegistry();
+    await confirmOperation(makeRequest({ parameters: { path: "/a" } }), channel, registry, 1000);
 
     const different = await confirmOperation(
       makeRequest({ parameters: { path: "/b" } }),
       channel,
-      used,
+      registry,
       1000,
     );
-    expect(different.confirmed).toBe(true);
+    expect(different.outcome.confirmed).toBe(true);
   });
 
   it("guarantee 4/5: rejected response denies, does not consume the hash for future replay", async () => {
     const channel = new ScriptedChannel({ kind: "rejected" });
-    const used = new Set<OperationHash>();
-    const result = await confirmOperation(makeRequest(), channel, used, 1000);
+    const registry = new OperationHashRegistry();
+    const { outcome, operationHash } = await confirmOperation(
+      makeRequest(),
+      channel,
+      registry,
+      1000,
+    );
 
-    expect(result).toEqual({ confirmed: false, reason: "rejected" });
-    expect(used.size).toBe(0);
+    expect(outcome).toEqual({ confirmed: false, reason: "rejected" });
+    expect(registry.get(operationHash)).toBeUndefined();
   });
 
   it("guarantee 4: timeout denies by default", async () => {
     const channel = new ScriptedChannel({ kind: "timed-out" });
-    const used = new Set<OperationHash>();
-    const result = await confirmOperation(makeRequest(), channel, used, 1000);
+    const registry = new OperationHashRegistry();
+    const { outcome } = await confirmOperation(makeRequest(), channel, registry, 1000);
 
-    expect(result).toEqual({ confirmed: false, reason: "timed-out" });
+    expect(outcome).toEqual({ confirmed: false, reason: "timed-out" });
   });
 
   it("guarantee 3: the channel is shown the real resolved command and host, not raw Core data", async () => {
     const channel = new ScriptedChannel({ kind: "approved" });
-    const used = new Set<OperationHash>();
+    const registry = new OperationHashRegistry();
     await confirmOperation(
       makeRequest({
         resolvedCommand: ["systemctl", "restart", "nginx"],
         hostname: "web-1.internal",
       }),
       channel,
-      used,
+      registry,
       1000,
     );
 
     expect(channel.promptsSeen[0]?.resolvedCommand).toEqual(["systemctl", "restart", "nginx"]);
     expect(channel.promptsSeen[0]?.hostname).toBe("web-1.internal");
+  });
+
+  // --- DEC-045: MCP tools/call cancellation ---
+
+  it("cancellation before confirmation: a subsequent approval is discarded", async () => {
+    const req = makeRequest();
+    const channel = new ScriptedChannel({ kind: "approved" });
+    const registry = new OperationHashRegistry();
+
+    const cancelled = cancelOperation(
+      registry,
+      req.identity,
+      req.parameters,
+      req.hostId,
+      req.schemaFingerprint,
+    );
+    expect(cancelled).toBe(true);
+
+    const { outcome } = await confirmOperation(req, channel, registry, 1000);
+    expect(outcome).toEqual({ confirmed: false, reason: "cancelled" });
+  });
+
+  it("approval after cancellation: never reaches confirmed:true, even though the operator said yes", async () => {
+    const req = makeRequest();
+    const channel = new ScriptedChannel({ kind: "approved" });
+    const registry = new OperationHashRegistry();
+
+    cancelOperation(registry, req.identity, req.parameters, req.hostId, req.schemaFingerprint);
+
+    const { outcome } = await confirmOperation(req, channel, registry, 1000);
+    expect(outcome.confirmed).toBe(false);
+  });
+
+  it("race: cancellation recorded while the operator's approval is in flight is honored, not the approval", async () => {
+    const req = makeRequest();
+    const registry = new OperationHashRegistry();
+
+    // Simulates the channel resolving "approved" only after cancellation has already been
+    // recorded elsewhere (e.g. the MCP server processed notifications/cancelled first) — the
+    // synchronous check-then-mark in confirmOperation must still discard this late approval.
+    class RaceChannel implements ConfirmationChannel {
+      async requestConfirmation(): Promise<ConfirmationResponse> {
+        cancelOperation(registry, req.identity, req.parameters, req.hostId, req.schemaFingerprint);
+        return { kind: "approved" };
+      }
+    }
+
+    const { outcome } = await confirmOperation(req, new RaceChannel(), registry, 1000);
+    expect(outcome).toEqual({ confirmed: false, reason: "cancelled" });
+  });
+
+  it("cancellation after the confirmation was already approved does not retroactively invalidate it", async () => {
+    const req = makeRequest();
+    const channel = new ScriptedChannel({ kind: "approved" });
+    const registry = new OperationHashRegistry();
+
+    const { outcome } = await confirmOperation(req, channel, registry, 1000);
+    expect(outcome.confirmed).toBe(true);
+
+    // DEC-045 guarantee 5: cancellation arriving after approval must not flip the recorded state.
+    const cancelledSuccessfully = cancelOperation(
+      registry,
+      req.identity,
+      req.parameters,
+      req.hostId,
+      req.schemaFingerprint,
+    );
+    expect(cancelledSuccessfully).toBe(false);
+    expect(
+      registry.get(
+        // recompute via a second confirmOperation attempt would be refused as already-used, proving
+        // the "used" state was preserved rather than overwritten by the later cancellation
+        (await confirmOperation(req, channel, registry, 1000)).operationHash,
+      ),
+    ).toBe("used");
   });
 });

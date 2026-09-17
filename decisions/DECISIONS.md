@@ -844,6 +844,165 @@ Format per a cada decisió futura:
   DEC-008). Aísla la dependencia externa nueva (`ssh2`) fuera de `packages/core`, que no la
   necesita directamente.
 
+## DEC-043 — Número de servidores MCP (Fase 8)
+
+- Fecha: 2026-09-17
+- Contexto: había que decidir si AgentForge expone un único servidor MCP o varios, uno por
+  dominio (SSH ahora, futuros execution backends después).
+- Opciones consideradas: (A1) un único servidor MCP que agrega el catálogo vía Discovery
+  (Fase 4), agnóstico del origen de cada tool; (A2) varios servidores MCP, uno por dominio/backend
+  de ejecución.
+- Decisión: **(A1)**. Un único servidor MCP en esta fase.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: evita separación prematura sin beneficio demostrado con un solo backend de
+  ejecución (`execution-ssh`). Si en el futuro se añaden más backends
+  (`packages/execution-<nombre>`, DEC-008), Discovery ya los agrega de forma agnóstica al origen
+  — no obliga a partir el servidor MCP para soportarlos.
+
+## DEC-044 — Ubicación del servidor MCP en el monorepo (Fase 8)
+
+- Fecha: 2026-09-17
+- Contexto: mismo razonamiento que DEC-042 para Execution SSH — DEC-008 reservó el patrón
+  `packages/mcp-<nombre>` para servidores MCP propios.
+- Opciones consideradas: (B1) paquete propio `packages/mcp-server`; (B2) módulo dentro de
+  `packages/core`.
+- Decisión: **(B1)**. Aplicación directa del patrón ya reservado por DEC-008.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: aísla la dependencia del SDK MCP oficial fuera de `packages/core`. El servidor
+  MCP es, por diseño (DEC-047), un proceso distinto del proceso Execution — vive en su propio
+  paquete de código, pero se ejecuta como proceso separado en tiempo de ejecución.
+
+## DEC-045 — Confirmación humana durante `tools/call` (Fase 8)
+
+- Fecha: 2026-09-17
+- Contexto: DEC-038 (Fase 7) ya definió las garantías de la confirmación humana síncrona, pero no
+  contemplaba que la invocación llegara a través de una llamada MCP `tools/call` sujeta a timeouts
+  del cliente y a cancelación explícita del protocolo (`notifications/cancelled`), inexistente
+  como concepto en Fase 7. Un primer análisis propuso bloquear la llamada de forma simple (C1);
+  verificación técnica confirmó que Claude Code aplica timeouts reales a `tools/call` (con un
+  comportamiento de fiabilidad no completamente consistente documentado en el propio ecosistema),
+  por lo que bloquear sin más no es sólido sin un mecanismo adicional.
+- Opciones consideradas: (1A) progreso periódico (`notifications/progress`) manteniendo el
+  bloqueo síncrono de DEC-038, con gestión explícita de cancelación; (1B) patrón MCP de
+  tareas/entrada estructurada de larga duración, sin mantener la llamada abierta — descartado por
+  esta fase por complejidad alta y soporte no verificado con solidez en el ecosistema actual, sin
+  descartarlo para el futuro.
+- Decisión: **(1A)**, con las siguientes garantías obligatorias adicionales a las ya exigidas por
+  DEC-038:
+  1. Mientras `confirmOperation()` (DEC-038) está pendiente, el servidor MCP emite
+     `notifications/progress` periódicamente (por debajo del timeout del cliente) para mantener
+     viva la llamada `tools/call`.
+  2. El servidor MCP gestiona explícitamente `notifications/cancelled` para la petición en curso
+     — la cancelación se propaga activamente hasta la espera/canal de confirmación (incluyendo,
+     si aplica, hasta el proceso Execution vía el canal de DEC-047), no se limita a dejar de
+     emitir progreso.
+  3. **Antes de que la confirmación se resuelva como aprobada:** una cancelación equivale a
+     denegación — nunca se llega a `execute()`.
+  4. La condición de carrera entre cancelación y aprobación casi simultáneas se resuelve mediante
+     un **guard de estado atómico sobre el `OperationHash`** (DEC-038): la cancelación marca el
+     hash como inválido en la misma estructura de sincronización que ya garantiza el uso único: si
+     la aprobación del operador llega después de que el hash ya fue marcado como cancelado, se
+     descarta como `confirmed: false`, incluso si el operador ya respondió afirmativamente. La
+     comprobación de cancelación y el marcado de resultado deben ocurrir en el mismo tramo
+     síncrono, sin un `await` entre medias, para que la garantía sea real y no dependa del orden de
+     llegada en tiempo de reloj de pared.
+  5. **Después de que la confirmación se resolvió como `confirmed: true`:** una cancelación
+     posterior de la llamada MCP **no aborta una ejecución SSH ya comprometida/en curso** — abortar
+     un comando remoto a medias es más peligroso que dejarlo completar (riesgo de estado
+     inconsistente en el host remoto). La ejecución continúa hasta su resultado normal o hasta su
+     propio timeout de DEC-041 (único mecanismo de corte de una ejecución en curso); la cancelación
+     de la llamada MCP en ese punto solo afecta a si el servidor MCP todavía tiene a quién
+     entregarle el resultado — el resultado se descarta si la llamada ya fue cancelada, sin
+     intentar enviarlo por una petición que el cliente ya dio por cerrada.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, tras dos rondas de verificación técnica
+  y concreción explícita de las condiciones de carrera).
+- Consecuencias: DEC-038 queda ampliada, no contradicha — se le añade el manejo de un tipo de
+  ambigüedad (cancelación del cliente MCP) que no existía como concepto en Fase 7. 1B queda como
+  alternativa futura no descartada, a revisar si 1A demuestra fragilidad práctica frente al
+  comportamiento real de clientes MCP.
+
+## DEC-046 — Transporte del servidor MCP (Fase 8)
+
+- Fecha: 2026-09-17
+- Contexto: había que decidir cómo se conecta Claude Code al servidor MCP de AgentForge.
+- Opciones consideradas: (E1) stdio local (patrón estándar de servidores MCP locales); (E2) HTTP
+  local con autenticación por token.
+- Decisión: **(E1) stdio**. El servidor MCP se comunica con Claude Code exclusivamente por
+  stdin/stdout con framing JSON-RPC del protocolo MCP — **ningún otro contenido se escribe jamás
+  en stdout del proceso del servidor MCP**; diagnóstico/logging, si lo hay, usa exclusivamente
+  stderr.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, tras verificación técnica que confirmó
+  que stdio ocupa stdin/stdout por completo para el framing del protocolo — motivo directo de
+  DEC-047, que separa el proceso de confirmación humana del proceso del servidor MCP).
+- Consecuencias: sin necesidad de gestionar puertos/tokens para el canal Claude Code↔servidor MCP.
+  Establece la restricción dura que hace necesaria DEC-047: como stdio ocupa stdin/stdout, el
+  servidor MCP no puede alojar también una interacción humana interactiva (`ReadlineConfirmationChannel`,
+  DEC-038) sobre ese mismo stdin/stdout sin corromper el protocolo.
+
+## DEC-047 — Separación de procesos: servidor MCP y Execution (Fase 8)
+
+- Fecha: 2026-09-17
+- Contexto: DEC-046 estableció que el servidor MCP ocupa su propio stdin/stdout con el protocolo
+  MCP por stdio — verificación técnica confirmó que esto es un conflicto real y duro con
+  `ReadlineConfirmationChannel` (DEC-038), que también usa stdin/stdout. Se analizaron tres
+  alternativas (E1: separar procesos; E2: canal fuera de banda nuevo tipo HTTP local; E3:
+  detección de tty y denegación automática) sin elegir de antemano.
+- Opciones consideradas: (E1) servidor MCP y proceso Execution como procesos separados,
+  comunicados por IPC — con dos variantes: (E1a) Execution lanzado como hijo del servidor MCP;
+  (E1b) Execution arrancado independientemente por el operador, con el servidor MCP conectándose a
+  él; (E2) canal de confirmación fuera de banda (HTTP local/notificaciones de SO) — descartado por
+  esta fase por complejidad y superficie de seguridad nuevas no analizadas en ningún DEC-XXX
+  existente, sin descartarlo para el futuro; (E3) detección de tty con denegación automática si no
+  hay terminal interactiva — inviable como única medida porque en el modo de despliegue de esta
+  fase (servidor MCP por stdio) esa condición nunca se cumple, dejando `requires-confirmation`
+  permanentemente inútil; se conserva como salvaguarda adicional de bajo coste, no como solución
+  principal.
+- Decisión: **(E1b)**. El servidor MCP (`packages/mcp-server`, DEC-044) y el proceso Execution
+  (`packages/execution-ssh`, DEC-042, incluyendo `ReadlineConfirmationChannel`, DEC-038) son
+  **procesos separados**. El operador arranca Execution de forma independiente, con su propia
+  consola real, **antes** de que las tools de AgentForge que requieren confirmación estén
+  disponibles vía MCP — el servidor MCP nunca lanza a Execution como proceso hijo (se descarta
+  E1a: el servidor MCP no necesita ni debe tener capacidad de lanzar procesos con acceso a
+  terminal, evitando una superficie de escalada innecesaria).
+  - **Canal de comunicación:** reutiliza el **patrón de transporte** ya aprobado en DEC-010
+    (interfaz de transporte agnóstica de SO en `packages/shared` + implementación de named
+    pipe/Unix socket con ACL/permisos restringidos al usuario de SO local) como una **segunda
+    instancia** de ese patrón — **con un contrato de dominio propio y distinto**, nunca
+    reutilizando la interfaz `SecretsBrokerTransport` en sí (que está tipada específicamente para
+    el contrato Core↔Secrets Broker de DEC-014). No se modifica DEC-010.
+  - **Autenticación del canal:** igual que DEC-010 — restricción a nivel de SO (ACL del named
+    pipe / permisos del Unix socket) al usuario local que posee ambos procesos. A diferencia de
+    DEC-004 (Secrets Broker con usuario de SO distinto), aquí servidor MCP y Execution corren bajo
+    el mismo usuario local — la frontera protege contra otros procesos locales no relacionados,
+    no contra el propio operador.
+  - **Datos que cruzan el canal:** la petición de ejecución ya validada
+    (`identity`/parámetros/`hostId`/`PolicyDecision` con su `schemaFingerprint`) y, de vuelta, el
+    `ExecutionOutcome`. **Nunca** cruza la clave privada SSH (Execution la sigue pidiendo
+    directamente al Secrets Broker) ni el contenido de la interacción de confirmación en sí (vive
+    enteramente dentro del proceso Execution).
+  - **Fail-closed uniforme:** cualquier fallo, ambigüedad o pérdida del canal (Execution caído,
+    socket/pipe ocupado, conexión perdida a media operación, Execution reiniciado/sustituido) se
+    trata como imposibilidad de confirmar → `confirmation-required-but-missing`, nunca como
+    proceder sin confirmación. No hay reconexión automática que intente "recuperar" un resultado
+    tras una pérdida de conexión a media operación — eso reabriría la ambigüedad que se quiere
+    evitar.
+  - **Alcance de esta fase — límite documentado explícitamente:** el canal usa un nombre de
+    pipe/socket fijo, sin mecanismo de descubrimiento ni soporte de múltiples instancias
+    simultáneas de servidor MCP o de Execution. Esta fase contempla exactamente una instancia de
+    cada. Ampliarlo a múltiples instancias queda como trabajo futuro no resuelto aquí.
+  - Como el registro de hashes de confirmación ya usados (DEC-038 guarantee 2) vive en memoria
+    dentro del propio proceso Execution, un reinicio de Execution lo borra — mismo comportamiento
+    ya aceptado en Fase 7 para reinicios de proceso, ahora también válido para reconexiones del
+    servidor MCP tras un reinicio de Execution (se tratan como conexión nueva sin estado previo).
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, tras verificación técnica del conflicto
+  stdio/readline y dos rondas de concreción de la topología de procesos y sus casos de fallo).
+- Consecuencias: `ReadlineConfirmationChannel` y DEC-038 quedan **intactos**, sin ninguna
+  modificación — el cambio es de topología de procesos en Fase 8, no de las garantías de
+  confirmación ya aprobadas. Introduce una carga operacional real pero pequeña: el operador debe
+  arrancar Execution explícitamente para que las tools que requieren confirmación funcionen vía
+  MCP — coherente con "un solo desarrollador operando localmente". E2 queda como alternativa
+  futura no descartada si esta carga operacional resulta incómoda en la práctica.
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -896,6 +1055,11 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 - ~~Límites y no exposición de stdout/stderr (Fase 7)~~ → DEC-040.
 - ~~Timeout y cancelación de conexión SSH (Fase 7)~~ → DEC-041.
 - ~~Ubicación de Execution SSH en el monorepo (Fase 7)~~ → DEC-042.
+- ~~Número de servidores MCP (Fase 8)~~ → DEC-043.
+- ~~Ubicación del servidor MCP en el monorepo (Fase 8)~~ → DEC-044.
+- ~~Confirmación humana durante tools/call (Fase 8)~~ → DEC-045.
+- ~~Transporte del servidor MCP (Fase 8)~~ → DEC-046.
+- ~~Separación de procesos: servidor MCP y Execution (Fase 8)~~ → DEC-047.
 
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):

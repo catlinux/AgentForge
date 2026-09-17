@@ -6,7 +6,7 @@ import type {
 } from "@agentforge/shared";
 import type { ConfirmationChannel } from "./confirmation/confirmation-channel.js";
 import { confirmOperation } from "./confirmation/confirm.js";
-import type { OperationHash } from "./confirmation/operation-hash.js";
+import type { OperationHashRegistry } from "./confirmation/hash-registry.js";
 import { resolveCommandTemplate } from "./config/command-template.js";
 import { findHost, type ExecutionConfig } from "./config/host-config.js";
 import { executeOverSsh } from "./ssh/client.js";
@@ -14,7 +14,7 @@ import { executeOverSsh } from "./ssh/client.js";
 export interface ExecuteDependencies {
   readonly config: ExecutionConfig;
   readonly confirmationChannel: ConfirmationChannel;
-  readonly usedConfirmationHashes: Set<OperationHash>;
+  readonly confirmationRegistry: OperationHashRegistry;
   readonly confirmationTimeoutMs: number;
   readonly sshTimeoutMs: number;
   /** Fetches the ssh-key secret (DEC-031) from the Secrets Broker for the given host. Injected
@@ -56,9 +56,9 @@ export async function execute(
   }
 
   if (decision.verdict === "requires-confirmation") {
-    let outcome;
+    let result;
     try {
-      outcome = await confirmOperation(
+      result = await confirmOperation(
         {
           identity: decision.identity,
           parameters: request.parameters,
@@ -68,7 +68,7 @@ export async function execute(
           resolvedCommand,
         },
         deps.confirmationChannel,
-        deps.usedConfirmationHashes,
+        deps.confirmationRegistry,
         deps.confirmationTimeoutMs,
       );
     } catch {
@@ -76,8 +76,8 @@ export async function execute(
       // never fall through to execution (DEC-038 guarantee 5).
       return { kind: "confirmation-required-but-missing", reason: "channel-error" };
     }
-    if (!outcome.confirmed) {
-      return { kind: "confirmation-required-but-missing", reason: outcome.reason };
+    if (!result.outcome.confirmed) {
+      return { kind: "confirmation-required-but-missing", reason: result.outcome.reason };
     }
   }
 
