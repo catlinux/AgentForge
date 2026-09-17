@@ -51,10 +51,33 @@ ningún escenario no soportado por la arquitectura actual (ver la sección "Limi
   `~/.ssh/authorized_keys` del usuario remoto en tu host SSH (fuera del alcance de este manual —
   es configuración del host remoto, no de AgentForge). Guardas la ruta de la clave **privada**
   para usarla en la sección 4, donde das de alta su contenido en el Secrets Broker.
-- Para usar `connector-github` de verdad: un **Personal Access Token** de GitHub con los permisos
-  mínimos necesarios para las operaciones que quieras usar (`create_issue`, `list_issues`,
-  `comment_on_issue`). Créalo ahora, antes de seguir, desde GitHub → Settings → Developer settings
-  → Personal access tokens, si todavía no lo tienes — lo necesitas también en la sección 4.
+- Para usar `connector-github` de verdad: un **Personal Access Token** (PAT) de GitHub. Créalo
+  ahora, antes de seguir, si todavía no lo tienes — lo necesitas en la sección 4. Sigue estos pasos
+  exactos, con el navegador abierto en [github.com](https://github.com) y tu sesión ya iniciada:
+
+  1. Entra en <https://github.com/settings/personal-access-tokens/new> (o, si prefieres navegar a
+     mano: haz clic en tu foto de perfil arriba a la derecha → **Settings** → baja por el menú de
+     la izquierda hasta **Developer settings** (está al final del todo) → **Personal access
+     tokens** → **Fine-grained tokens** → botón **Generate new token**).
+  2. En **Token name**, escribe algo que reconozcas después, por ejemplo `agentforge`.
+  3. En **Expiration**, elige una fecha de caducidad (por ejemplo 90 días) — nunca dejes un token
+     sin caducidad.
+  4. En **Repository access**, elige **Only select repositories** y selecciona únicamente el
+     repositorio (o repositorios) donde quieras que AgentForge cree/lea/comente issues — nunca
+     elijas "All repositories" si no lo necesitas de verdad.
+  5. Baja hasta **Permissions** → **Repository permissions** → busca **Issues** en la lista → en
+     el desplegable de la derecha, cambia **No access** por **Read and write**. Este es el único
+     permiso que necesitas — no actives ningún otro.
+  6. Baja del todo y pulsa **Generate token**.
+  7. GitHub te muestra el token **una sola vez**, con el formato `github_pat_11AAAAAAA...` — cópialo
+     ahora mismo (botón de copiar al lado) y pégalo en un sitio temporal seguro (por ejemplo el
+     Bloc de notas, sin guardar el fichero). Si cierras esta página sin copiarlo, no podrás volver
+     a verlo — tendrás que crear uno nuevo.
+
+  Este permiso ("Issues: Read and write" en el repositorio elegido) es exactamente lo que
+  necesitan las 3 operaciones que soporta `connector-github` hoy: `create_issue`, `list_issues`,
+  `comment_on_issue` — todas actúan sobre issues de un repositorio, nada más. No se necesita
+  ningún otro permiso (ni acceso a código, ni a Pull Requests, ni a Actions, etc.).
 
 ## 2. Instalación del proyecto
 
