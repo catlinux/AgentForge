@@ -1,8 +1,14 @@
 # STATE.md — AgentForge
 
-**Última actualización:** 2026-09-17 (Fase 15 — Documentación y release, INSPECT+PLAN+EXECUTE+
-VERIFY completados, release `0.1.0` — pendiente de autorización de commit, push, y creación/push
-del tag `v0.1.0`)
+**Última actualización:** 2026-09-17 (Fase 16 — Stable Release, INSPECT+PLAN+EXECUTE completados,
+VERIFY completo pasa limpio — pendiente de presentar el resultado y de autorización explícita de
+`git commit`/`git push`)
+
+**Corrección sobre una afirmación desactualizada de esta misma sección:** el commit y push de la
+Fase 15 (`806badf`, "release 0.1.0") **ya están hechos** — detectado durante el INSPECT de la
+Fase 16 (`git status`: working tree limpio, `master` sincronizado con `origin/master`). La versión
+anterior de esta sección decía que seguían pendientes de autorización; no se volvió a actualizar
+tras ejecutarse. No se verificó la existencia de un tag `v0.1.0` (no comprobado explícitamente).
 
 ## Proyecto
 
@@ -14,7 +20,17 @@ copiar).
 
 ## Fase actual
 
-**Fase 15 — Documentación y release**
+**Fase 16 — Stable Release**
+
+**Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 1 decisión aprobada
+(DEC-080: cierre de DEC-010 —transporte IPC Core↔Secrets Broker— sin implementar, fuera de
+alcance de la 1.0, por no tener ningún consumidor real hoy). Ver sección "Fase 16" en "Trabajo
+completado" más abajo para el detalle completo, y `decisions/DECISIONS.md` para el registro
+formal de DEC-080.
+
+---
+
+**Fase 15 — Documentación y release** (fase anterior, resumen conservado)
 
 **Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 5 decisiones aprobadas
 (DEC-075: licencia MIT; DEC-076: visibilidad del repositorio decidida como Público — decisión
@@ -63,14 +79,16 @@ APROBADAS E IMPLEMENTADAS (Fase 9: DEC-048 a DEC-051) + AUDIT LOG APROBADO E IMP
 DASHBOARD WEB APROBADO E IMPLEMENTADO (Fase 12: DEC-064 a DEC-069) + HARDENING DE SEGURIDAD
 APROBADO E IMPLEMENTADO (Fase 13: DEC-070 a DEC-071) + TESTING E INTEGRACIÓN APROBADO E
 IMPLEMENTADO (Fase 14: DEC-072 a DEC-074) + DOCUMENTACIÓN Y RELEASE APROBADO E IMPLEMENTADO
-(Fase 15: DEC-075 a DEC-079, release `0.1.0`). Resto documentado como PROPOSAL/OPEN QUESTION en
-`architecture/ARCHITECTURE.md` §20.
+(Fase 15: DEC-075 a DEC-079, release `0.1.0`) + STABLE RELEASE APROBADA E IMPLEMENTADA (Fase 16:
+DEC-080, entrypoints reales mínimos para los 4 procesos existentes). Resto documentado como
+PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20 (nota: esa sección quedó
+desactualizada tras varias fases posteriores a su redacción — ver corrección aplicada en esta
+misma Fase 16, sección correspondiente más abajo).
 
 ## Microtarea actual
 
-Fase 15 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
-y de autorización explícita y separada de `git commit`, `git push`, y creación/push del tag
-`v0.1.0` (todavía no solicitadas ni concedidas para esta fase).
+Fase 16 con EXECUTE y VERIFY completos, pendiente de presentar el resultado al usuario y de
+autorización explícita de `git commit`/`git push` (todavía no concedidas para esta fase).
 
 ## Trabajo completado
 
@@ -1144,6 +1162,90 @@ decisión automática.
       todavía no concedidas. La verificación real de la ejecución de CI en GitHub Actions queda a
       cargo del usuario tras el push, según su propia indicación explícita.
 
+**Nota posterior (Fase 16):** el commit (`806badf`) y el push de esta fase ya se ejecutaron —
+confirmado por `git log`/`git status` durante el INSPECT de la Fase 16. No se comprobó la
+existencia del tag `v0.1.0`.
+
+### Fase 16 — Stable Release (INSPECT + PLAN + EXECUTE + VERIFY completados, 2026-09-17)
+- [x] **INSPECT** (delegado a un agente Explore en background + verificación directa): confirmado
+      `git status` limpio y sincronizado con `origin/master`; `pnpm run typecheck`/`lint`/`test`
+      (250/252, 2 skip heredados)/`build`/`test:integration` (4/4) pasan limpio antes de tocar
+      nada. Revisadas Fases 12-15 de `STATE.md`, DEC-061 a DEC-079, y `architecture/
+      ARCHITECTURE.md` §20 (confirmado desactualizado: varias preguntas "abiertas" ya resueltas
+      por DEC posteriores sin reflejarlo). Verificado explícitamente en código (no solo en
+      documentación): `packages/core/src/transport/index.ts` y `packages/secrets-broker/src/
+      transport/index.ts` siguen siendo el placeholder de la Fase 2 (DEC-010); `grep` sobre
+      `packages/core/src` confirmó que ningún módulo real de Core lo consume. Ningún `main`/CLI de
+      producción real existía en ningún paquete. Sin rotación de Audit Log (ausencia real en
+      código, no solo documental). CI no depende de secretos ni sistemas externos.
+- [x] **PLAN** presentado y autorizado con condiciones explícitas del usuario: resolver DEC-010
+      solo si tiene consumidor real (si no, documentar y no implementar IPC innecesario);
+      implementar los `main` mínimos necesarios para arrancar los procesos existentes; corregir
+      solo la documentación que quede inconsistente como consecuencia; sin funcionalidades nuevas,
+      conectores nuevos, CLI elaborada, Linux/macOS, rotación de logs, OAuth, ni multiusuario.
+- [x] **DEC-080** — Cierre de DEC-010 (transporte IPC Core↔Secrets Broker) sin implementar: sin
+      consumidor real hoy (cada Execution Backend ya habla directo con el Secrets Broker vía el
+      canal real de DEC-070, Fase 13), fuera de alcance de la 1.0. El placeholder de código se
+      mantiene intacto, no se elimina ni se implementa IPC especulativo.
+- [x] Implementación — 4 entrypoints reales mínimos, cada uno reutilizando exactamente el wiring
+      ya existente (sin lógica nueva de negocio):
+      - `packages/secrets-broker/src/main.ts` — `startSecretsBroker(dataDir, socketPath)`: carga/
+        crea la clave maestra real (`MasterKeyStore`), abre el `SecretStore` real, arranca
+        `startExecutionSecretsServer` (canal real de DEC-070) en el pipe/socket fijo de
+        `executionSecretsChannelPath()`.
+      - `packages/execution-ssh/src/main.ts` — `startExecutionSsh(dataDir, socketPath)`: carga la
+        configuración real de hosts (`loadExecutionConfig`, con fallback a configuración vacía si
+        el fichero todavía no existe — no es un error, es el estado inicial válido), arranca
+        `startExecutionServer` con `ReadlineConfirmationChannel` real y `OperationHashRegistry`
+        nuevo; `getSshKeySecret` se deja sin definir para que `startExecutionServer` use su
+        cliente real por defecto del canal de Secrets Broker (Fase 13).
+      - `packages/connector-github/src/main.ts` — mismo patrón que `execution-ssh`, para
+        `startConnectorServer`/`loadConnectorConfig`.
+      - `packages/mcp-server/src/main.ts` — `buildMcpServerDeps()`: conecta Registry
+        (`FileToolRegistryStore`), Discovery (`StaticConfigDiscoveryStrategy`/`discoverTools`,
+        config con fallback vacío) y Policy Engine (`evaluate`/`InMemoryPolicyApprovalStore`, config
+        con fallback vacío) reales de `packages/core`, y resuelve un `ExecutionChannelClient` real
+        por `origin.id` ("execution-ssh"/"connector-github") a los pipes/sockets fijos de cada
+        backend — `main()` invoca `startStdioServer(deps)`. Usa `process.stderr.write` en vez de
+        `console.error` para el fallo de arranque, porque el propio paquete prohíbe `console.*` en
+        todo su código fuente (`no-stdout-pollution.test.ts`, DEC-046) para hacer imposible
+        contaminar accidentalmente stdout, reservado exclusivamente a los frames del protocolo MCP.
+      - Cada `main.ts` expone también una función interna testeable (`startSecretsBroker`,
+        `startExecutionSsh`, `startConnectorGithub`, `buildMcpServerDeps`) separada del `main()`
+        que arranca el proceso real — permite testear el wiring real sin depender de arrancar un
+        proceso del sistema operativo.
+- [x] Tests nuevos (Vitest) — 4, uno por entrypoint, todos contra código real (sin mocks del
+      propio wiring): `secrets-broker/src/main.test.ts`, `execution-ssh/src/main.test.ts`,
+      `connector-github/src/main.test.ts` arrancan el servidor real sobre un socket/pipe temporal
+      y verifican que acepta una conexión real; `mcp-server/src/main.test.ts` verifica que
+      `buildMcpServerDeps()` contra un `AGENTFORGE_DATA_DIR` vacío (sin ficheros de Registry/
+      Discovery/Policy todavía) produce un catálogo vacío sin lanzar, resuelve ambos
+      `ExecutionChannelClient` por nombre de origen, y `resolveHostId` extrae el campo esperado.
+- [x] Alcance respetado, verificado explícitamente antes de cerrar: no se implementó DEC-010; no
+      se añadió ningún conector nuevo; no se creó CLI con subcomandos/flags (solo `main()` de
+      proceso); no se tocó la rama Linux/macOS de ningún transporte; no se implementó rotación de
+      Audit Log; no se añadió OAuth ni soporte multiusuario; no se eliminó ni recortó ninguna
+      funcionalidad existente — todos los módulos reutilizados (`startExecutionServer`,
+      `startConnectorServer`, `startExecutionSecretsServer`, `createMcpServer`/`startStdioServer`,
+      `evaluate`, `discoverTools`, etc.) se usan exactamente como ya estaban, sin modificarlos.
+- [x] Documentación actualizada: `decisions/DECISIONS.md` (DEC-080 nueva; punto 7 de "Genuinamente
+      pendientes" corregido de "pendiente" a "cerrado sin implementar"; punto 8 nuevo marcando los
+      `main`/CLI como resueltos); `STATE.md` (esta sección; corrección de la afirmación
+      desactualizada sobre commit/push de Fase 15; lista de decisiones aprobadas con DEC-080;
+      sección "Propuestas" corregida para reflejar que 80 decisiones ya están aprobadas, no 5).
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 8 paquetes + `tests/integration`;
+      `pnpm run lint` sin errores (tras corregir dos rondas de hallazgos reales del propio lint:
+      imports no usados en 3 ficheros de test, y dos funciones sin usar los loaders reales de
+      configuración en `mcp-server/src/main.ts` — corregido para reutilizar `loadDiscoveryConfig`/
+      `loadPolicyConfig` en vez de un parser JSON genérico duplicado); `pnpm run format` correcto
+      (tras `--write` sobre los 4 `main.ts` nuevos); `pnpm run test` — 254/256 correctos (2 skip
+      POSIX heredados de Fase 6, sin cambios), incluidos los 4 tests nuevos de entrypoints; `pnpm
+      run build` correcto en los 8 paquetes; `pnpm run test:integration` — 4/4 correctos, sin
+      cambios (los entrypoints nuevos no tocan el código que esos tests ejercitan). Ningún sistema
+      remoto real tocado; ningún cambio de visibilidad de GitHub ejecutado. Working tree pendiente
+      de revisión final por el usuario antes de `git commit`/`git push` (no autorizados todavía
+      para esta fase).
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -1264,16 +1366,28 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-077** — Versionado SemVer desde `0.1.0`, primera release interna del estado actual.
 - **DEC-078** — CI/CD: GitHub Actions, matriz Linux/Windows.
 - **DEC-079** — Traducción al inglés de `TECH-STACK-ANALYSIS.md`/`CORE-STRUCTURE-ANALYSIS.md`.
+- **DEC-080** — Cierre de DEC-010 (transporte IPC Core↔Secrets Broker) sin implementar: sin
+  consumidor real, fuera de alcance de la 1.0.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
 ## Propuestas (no decisiones)
 
-La mayor parte de `architecture/ARCHITECTURE.md` sigue siendo PROPOSAL (marcado explícitamente
-sección por sección). 5 decisiones están aprobadas (DEC-003 a DEC-007); todo lo demás (diseño del
-Tool Registry, formato del Audit Log, lenguaje de reglas del Policy Engine, mecanismo de IPC,
-framework HTTP concreto, etc.) sigue abierto. Ver `architecture/ARCHITECTURE.md` §20 para el
-listado completo de preguntas abiertas.
+**Nota (Fase 16):** el párrafo original de esta sección afirmaba que "la mayor parte de
+`architecture/ARCHITECTURE.md` sigue siendo PROPOSAL" y que solo 5 decisiones (DEC-003 a DEC-007)
+estaban aprobadas — desactualizado desde hace muchas fases: hoy hay 80 decisiones aprobadas
+(DEC-001 a DEC-080) que materializan la práctica totalidad de los componentes descritos en
+`architecture/ARCHITECTURE.md` (Registry, Discovery, Policy Engine, Secrets Broker, Execution
+SSH, MCP Server, Sessions, Audit Log, Connectors, Dashboard). El documento en sí sigue marcado
+"PROPOSAL" sección por sección porque nunca se ha "despropuesto" formalmente tras cada DEC — es
+una tarea de limpieza documental pendiente, no una indicación de que el diseño siga sin decidir.
+`architecture/ARCHITECTURE.md` §20 en concreto lista preguntas "abiertas" de las que varias (Audit
+Log, framework HTTP, licencia) ya están resueltas por DEC posteriores sin que esa sección se haya
+actualizado — corregido parcialmente en la Fase 16 (ver más abajo). Las únicas preguntas
+genuinamente abiertas hoy son: soporte multi-usuario/multi-agente futuro (DEC-048 ya fija
+single-user/single-agent, sin fecha de revisión); usuario de sistema dedicado en cada host remoto
+real (Debian casa, Contabo) — no se puede resolver sin tocar esos sistemas; rama Linux/macOS del
+transporte IPC (DEC-010, cerrado sin implementar por DEC-080, ninguna rama tiene transporte real).
 
 ## Decisiones pendientes
 

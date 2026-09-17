@@ -26,7 +26,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 13 | Hardening de seguridad | **Completada** — 2 decisiones aprobadas (DEC-070, DEC-071) |
 | 14 | Testing e integración | **Completada** — 3 decisiones aprobadas (DEC-072 a DEC-074) |
 | 15 | Documentación y release | **Completada** — 5 decisiones aprobadas (DEC-075 a DEC-079), release `0.1.0` |
-| 16 | Stable Release | Propuesta, no iniciada |
+| 16 | Stable Release | **Completada** — 1 decisión aprobada (DEC-080) |
 
 ## Fase 0 — Investigación técnica (completada)
 
@@ -182,7 +182,15 @@ de ellas.
   `test:integration` en cada push/PR a `master`); traducción al inglés de
   `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`. `CHANGELOG.md` gana una primera
   entrada versionada `[0.1.0]`, reemplazando la sección `[Unreleased]` ya cerrada.
-- **Fase 16 — Stable Release**: primera versión estable.
+- **Fase 16 — Stable Release** (completada): 1 decisión aprobada (DEC-080, ver
+  `decisions/DECISIONS.md`): cierre de DEC-010 (transporte IPC Core↔Secrets Broker) sin
+  implementar, por no tener ningún consumidor real — cada Execution Backend ya obtiene secretos
+  por el canal real de DEC-070 (Fase 13). Implementación: 4 entrypoints reales mínimos
+  (`src/main.ts`) para los procesos que ya existían como código sin ningún punto de entrada real
+  (`secrets-broker`, `execution-ssh`, `connector-github`, `mcp-server`), reutilizando exactamente
+  el wiring ya implementado en fases anteriores, sin CLI con subcomandos ni funcionalidad nueva.
+  Diferencia real con `0.1.0`: el sistema ahora se puede arrancar de verdad como procesos
+  independientes, no solo ejecutarse en tests.
 
 ## Decisiones pendientes que condicionan este roadmap
 

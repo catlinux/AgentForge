@@ -726,16 +726,36 @@ fases posteriores o al implementar)
 4. ~~Lenguaje de reglas del Policy Engine: ¿allowlists planas o algo más expresivo? (§7)~~ —
    **resuelto en Fase 5, ver DEC-023 a DEC-029.**
 5. ~~Mecanismo concreto de IPC entre AgentForge Core y el Secrets Broker (§3, §8, §18)~~ —
-   **resuelto en Fase 2, ver DEC-010** (named pipe en Windows / Unix domain socket en Linux-macOS,
-   tras interfaz agnóstica en `packages/shared`).
+   **diseño resuelto en Fase 2, ver DEC-010** (named pipe en Windows / Unix domain socket en
+   Linux-macOS, tras interfaz agnóstica en `packages/shared`); **implementación cerrada sin
+   construirse en Fase 16, ver DEC-080** — verificado en código que ningún módulo real de
+   `packages/core` consume ese transporte (cada Execution Backend ya obtiene secretos por el canal
+   real e independiente de DEC-070, Fase 13); el placeholder permanece intacto, fuera de alcance
+   de la 1.0 hasta que exista un caso de uso real.
 6. Usuario de sistema dedicado en cada host remoto (Debian, Contabo) — no se puede resolver sin
-   tocar esos sistemas, pendiente para cuando se autorice la Fase 7 (§9)
-7. Formato/almacenamiento del Audit Log (fichero JSON Lines vs. SQLite) (§12)
-8. Soporte multi-usuario/multi-agente futuro (§11)
-9. Framework HTTP concreto, paquete de Windows Credential Manager y empaquetado del Secrets
-   Broker dentro del stack TypeScript/Node.js ya decidido (§17)
-10. Licencia del proyecto (heredada de fases anteriores, ver `decisions/DECISIONS.md`)
+   tocar esos sistemas, sigue genuinamente pendiente a día de hoy (Fase 16).
+7. ~~Formato/almacenamiento del Audit Log (fichero JSON Lines vs. SQLite) (§12)~~ — **resuelto en
+   Fase 10, ver DEC-053**: JSON Lines append-only, un fichero por proceso escritor, sin SQLite.
+8. Soporte multi-usuario/multi-agente futuro (§11) — sigue genuinamente abierto (DEC-048 fija
+   single-user/single-agent sin fecha de revisión).
+9. ~~Framework HTTP concreto, paquete de Windows Credential Manager y empaquetado del Secrets
+   Broker dentro del stack TypeScript/Node.js ya decidido (§17)~~ — el framework HTTP se resolvió
+   en Fase 12, ver DEC-066 (Fastify, para el Dashboard); el paquete de Windows Credential Manager
+   quedó obsoleto por DEC-030 (Fase 6: sin OS credential store, fichero cifrado propio en su
+   lugar); el empaquetado del Secrets Broker como proceso independiente sigue sin un mecanismo de
+   distribución/instalación real (existe ya un `main.ts` real desde Fase 16, pero no un
+   instalador/paquete distribuible).
+10. ~~Licencia del proyecto (heredada de fases anteriores, ver `decisions/DECISIONS.md`)~~ —
+    **resuelto en Fase 15, ver DEC-075**: MIT.
 
 Ninguna de estas preguntas bloquea considerar la Fase 1 completada como *base arquitectónica* — se
 seguirán resolviendo a medida que se acerque su implementación concreta, según la metodología del
 proyecto (`.claude/CLAUDE.md`).
+
+**Nota (Fase 16):** esta sección documenta preguntas abiertas *de la Fase 1* — quedó sin
+actualizar durante varias fases posteriores pese a que muchas de esas preguntas ya se resolvieron
+(corregido arriba en esta misma Fase 16). El resto del documento (§1 a §19) sigue formalmente
+marcado "PROPOSAL"/"OPEN QUESTION" sección por sección sin haberse actualizado tampoco, aunque en
+la práctica cada componente descrito ya tiene decisiones reales (DEC-001 a DEC-080) que lo
+materializan — ver `STATE.md`, sección "Propuestas (no decisiones)", para el detalle. Actualizar
+el resto del documento sección por sección queda fuera del alcance mínimo de la Fase 16.

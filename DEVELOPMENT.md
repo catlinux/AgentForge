@@ -229,10 +229,12 @@ ver `decisions/DECISIONS.md`.
   extendida con `resolveRegistryCachePath`/`resolveDiscoveryConfigPath`/`resolvePolicyConfigPath`
   en `packages/shared`, usadas solo por el Dashboard para leer (DEC-069).
 - **Ubicación:** `packages/dashboard`, paquete propio.
-- **Limitación documentada:** ningún paquete tiene todavía un `main`/CLI real de producción —
-  `startStdioServer`/`startExecutionServer`/`startConnectorServer` siguen siendo funciones de
-  librería, nunca invocadas como proceso real fuera de test. El Dashboard de esta fase se verifica
-  con fixtures generadas a mano, no con datos de una ejecución real.
+- **Limitación de esta fase, resuelta después:** en Fase 12 ningún paquete tenía todavía un
+  `main`/CLI real de producción — `startStdioServer`/`startExecutionServer`/`startConnectorServer`
+  seguían siendo funciones de librería, nunca invocadas como proceso real fuera de test. El
+  Dashboard de esta fase se verificó con fixtures generadas a mano, no con datos de una ejecución
+  real. **Resuelto en Fase 16** (ver más abajo) para los 4 procesos de backend — el Dashboard
+  sigue sin `main`/script de arranque propio en `package.json`, fuera de alcance de la Fase 16.
 
 **DECIDIDO (DEC-070 a DEC-071, Fase 13, 2026-09-17):** canal real Execution Backend↔Secrets Broker
 y revisión/DEC-036 — ver `decisions/DECISIONS.md`.
@@ -280,21 +282,53 @@ versionado, CI/CD, y traducción de documentos de arquitectura — ver `decision
 - **Traducción:** `architecture/TECH-STACK-ANALYSIS.en.md` y
   `architecture/CORE-STRUCTURE-ANALYSIS.en.md` añadidos (DEC-079).
 
+**DECIDIDO (DEC-080, Fase 16, 2026-09-17):** cierre de DEC-010 y entrypoints reales — ver
+`decisions/DECISIONS.md`.
+
+- **DEC-010 (transporte IPC Core↔Secrets Broker):** cerrado explícitamente sin implementar
+  (DEC-080). Verificado en código que ningún módulo real de `packages/core` lo consume — cada
+  Execution Backend (`execution-ssh`, `connector-github`) ya obtiene secretos por el canal real e
+  independiente de DEC-070 (Fase 13). El placeholder de `packages/core/src/transport` y
+  `packages/secrets-broker/src/transport` permanece intacto, sin implementar, hasta que exista un
+  caso de uso real.
+- **Entrypoints reales mínimos:** `src/main.ts` nuevo en `packages/secrets-broker`,
+  `packages/execution-ssh`, `packages/connector-github` y `packages/mcp-server` — cada uno
+  reutiliza exactamente el wiring ya existente de fases anteriores (config loaders,
+  `startExecutionServer`/`startConnectorServer`/`startExecutionSecretsServer`/`startStdioServer`,
+  Registry/Discovery/Policy Engine reales), sin lógica de negocio nueva ni CLI con subcomandos.
+  Cada uno expone también una función interna testeable, separada del `main()` de proceso.
+- **Fuera de alcance, sin cambios:** rama Linux/macOS de cualquier transporte; rotación de Audit
+  Log; OAuth; multiusuario; nuevos conectores; instalador o gestión de servicio del sistema
+  operativo; `main`/script de arranque para `packages/dashboard` (sigue arrancándose solo vía
+  `startDashboard(port)` programáticamente o en test).
+
 ## Cómo ejecutar el proyecto
 
-No existe todavía ningún `main`/CLI de producción real que arranque los procesos (`mcp-server`,
-`execution-ssh`, `connector-github`, `secrets-broker`, `dashboard`) como un despliegue completo —
-hallazgo explícito de la Fase 12, documentado como limitación heredada, candidato a una fase
-futura dedicada (ver `decisions/DECISIONS.md`, DEC-065/069). Cada paquete se ejecuta y verifica
-hoy mediante:
+Desde la Fase 16, cada proceso de backend tiene un punto de entrada real mínimo. Tras
+`pnpm run build`, cada uno se arranca con `node dist/main.js` desde su carpeta (o
+`pnpm --filter <paquete> exec node dist/main.js` desde la raíz):
 
-- `pnpm run test` — tests unitarios/aislados de los 8 paquetes.
+1. `packages/secrets-broker` — crea/carga su clave maestra real y sirve el canal de DEC-070.
+2. `packages/execution-ssh` y/o `packages/connector-github` — cargan su configuración real
+   (o arrancan con configuración vacía si el fichero todavía no existe) y sirven su canal IPC.
+3. `packages/mcp-server` — habla por stdio (DEC-046); pensado para ser lanzado por un cliente MCP
+   (Claude Code u otro), no para ejecutarse directamente en una terminal interactiva.
+
+Todos leen/escriben bajo `AGENTFORGE_DATA_DIR` (por defecto `~/.agentforge`). Esto es un mínimo
+funcional — sigue sin existir instalador, gestión de servicio del sistema operativo, ni
+empaquetado para distribución (ver `architecture/ARCHITECTURE.md` §20, punto 9).
+
+Además:
+
+- `pnpm run test` — tests unitarios/aislados de los 8 paquetes, incluidos los 4 tests nuevos de
+  Fase 16 que ejercitan cada entrypoint real (arrancan el servidor real sobre un socket/pipe
+  temporal, sin mockear el wiring).
 - `pnpm run test:integration` — tests de integración real entre procesos (`tests/integration/`,
-  Fase 14), que sí arrancan procesos reales del sistema operativo, pero mediante scripts de test
-  propios, no un bootstrap de producción.
+  Fase 14), que arrancan procesos reales del sistema operativo contra servidores SSH/HTTP
+  simulados en loopback, nunca sistemas remotos reales.
 - `packages/dashboard`: `startDashboard(port)` (`packages/dashboard/src/server.ts`) arranca un
-  servidor real en `127.0.0.1:<port>` — es la única pieza con un punto de entrada pensado para
-  ejecutarse fuera de test, aunque todavía sin script de arranque en `package.json`.
+  servidor real en `127.0.0.1:<port>` — sigue siendo la única pieza sin un `main.ts`/script de
+  arranque en `package.json`, fuera de alcance de la Fase 16.
 
 ## Cómo instalar dependencias
 

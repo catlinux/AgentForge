@@ -80,6 +80,7 @@ AgentForge llena específicamente estos huecos — no reimplementa lo que Claude
 | Hardening de seguridad | **Completada** (Fase 13) |
 | Testing e integración | **Completada** (Fase 14) |
 | Documentación y release | **Completada** (Fase 15) — release `0.1.0` |
+| Stable Release: entrypoints reales para arrancar los procesos existentes | **Completada** (Fase 16) |
 | Implementación de software | **Sí — 8 paquetes TypeScript/Node.js reales, con tests automatizados** |
 | Repositorio Git | Inicializado, con historial completo de fases |
 | Repositorio remoto | `https://github.com/catlinux/AgentForge` — visibilidad decidida como Público (DEC-076), cambio real pendiente de aplicar por el usuario |
@@ -112,8 +113,29 @@ Cada componente corre como proceso separado, comunicado por canales IPC propios 
 Windows, Unix domain socket en Linux/macOS), con fail-closed uniforme ante cualquier ambigüedad.
 El detalle completo de cada decisión está en `architecture/ARCHITECTURE.md` (y su equivalente
 `architecture/ARCHITECTURE.en.md`) y en `decisions/DECISIONS.md` — más de 80 decisiones aprobadas
-a lo largo de 15 fases. El documento original de la Fase 0, `architecture/ARCHITECTURE-DRAFT.md`,
+a lo largo de 16 fases. El documento original de la Fase 0, `architecture/ARCHITECTURE-DRAFT.md`,
 se conserva como referencia histórica.
+
+### Cómo arrancar los procesos reales
+
+Desde la Fase 16 cada paquete de proceso tiene un punto de entrada mínimo real (`pnpm run build`
+primero, luego cada uno con `node dist/main.js` desde su carpeta, o `pnpm --filter <paquete> exec
+node dist/main.js` desde la raíz). Orden recomendado — el operador arranca cada backend de forma
+independiente **antes** de que las tools que requieren confirmación humana estén disponibles vía
+MCP (DEC-047):
+
+1. `packages/secrets-broker` — Secrets Broker (crea su clave maestra si no existe).
+2. `packages/execution-ssh` y/o `packages/connector-github` — Execution Backends (piden
+   confirmación por consola cuando corresponde, DEC-038).
+3. `packages/mcp-server` — servidor MCP (habla por stdio, pensado para ser lanzado por Claude
+   Code u otro cliente MCP, no directamente en una terminal interactiva).
+
+Todos los ficheros de datos/configuración (claves, secretos cifrados, configuración de hosts/
+cuentas, Audit Log) viven bajo `AGENTFORGE_DATA_DIR` (por defecto `~/.agentforge`) — sin ese
+fichero de configuración todavía, cada proceso arranca igualmente con un catálogo/configuración
+vacíos, no con un error. Esto es un mínimo funcional, no una CLI de producción con instalador,
+gestión de servicios del sistema operativo, ni empaquetado para distribución — eso sigue fuera de
+alcance de la 1.0 (ver `architecture/ARCHITECTURE.md` §20, punto 9).
 
 ## Principios principales
 

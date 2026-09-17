@@ -1707,6 +1707,35 @@ Format per a cada decisió futura:
   `architecture/CORE-STRUCTURE-ANALYSIS.en.md` nuevos, contenido equivalente (no traducción
   automática palabra por palabra, mismo criterio ya aplicado a `README.en.md`/`ARCHITECTURE.en.md`).
 
+## DEC-080 — Cierre de DEC-010 (transporte IPC Core↔Secrets Broker): sin implementar, fuera de
+alcance de la 1.0 (Fase 16)
+
+- Fecha: 2026-09-17
+- Contexto: el INSPECT de la Fase 16 confirmó en código (no solo en documentación) que
+  `packages/core/src/transport/index.ts` y `packages/secrets-broker/src/transport/index.ts`
+  siguen siendo el placeholder de 3 líneas de la Fase 2 (DEC-010) — nunca implementado en ningún
+  sistema operativo. Se verificó explícitamente (`grep` sobre `packages/core/src`) que ningún
+  módulo real de Core importa o consume ese transporte: cada Execution Backend
+  (`execution-ssh`, `connector-github`) ya obtiene secretos directamente del Secrets Broker por
+  el canal real e independiente de DEC-070 (Fase 13), que no depende de DEC-010 en absoluto. No
+  existe hoy ningún flujo real en el que `packages/core` necesite hablar con el Secrets Broker.
+- Opciones consideradas: (A) implementar el transporte real (al menos la rama Windows) para
+  cerrar DEC-010 antes de 1.0; (B) documentar explícitamente que DEC-010 no tiene consumidor real
+  y queda fuera de alcance de la 1.0, sin implementarlo ni eliminar el placeholder.
+- Decisión: **(B)**. DEC-010 se cierra sin implementación — el placeholder permanece intacto en
+  `packages/core/src/transport` y `packages/secrets-broker/src/transport` como lo que es: una
+  interfaz reservada para un caso de uso que no existe todavía. No se elimina código ni se
+  implementa IPC innecesario solo para "completar" la fase.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, condición explícita del PLAN de
+  Fase 16: "Resolver DEC-010 únicamente si es realmente necesario... Si Core no necesita hablar
+  directamente con Secrets Broker en el flujo actual, documenta esa conclusión y no implementes
+  IPC innecesario").
+- Consecuencias: si en el futuro `packages/core` (o un futuro proceso que lo envuelva) necesita
+  leer secretos directamente, DEC-010 se retoma entonces con un caso de uso real que guíe su
+  diseño concreto, en vez de una implementación especulativa. No reabre ni modifica DEC-004
+  (Secrets Broker como proceso separado) ni DEC-070 (canal real Execution↔Secrets Broker, que
+  sigue siendo el único camino real de acceso a secretos en 1.0).
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -1802,6 +1831,9 @@ durante la Fase 2 o cuando corresponda):
    implementada todavía; solo la interfaz agnóstica y la implementación Windows están previstas
    para cuando se cree el esqueleto.
 7. ~~Canal real Execution↔Secrets Broker en producción~~ → **resuelto, ver DEC-070 (Fase 13)**. El
-   canal Core↔Secrets Broker de DEC-010 en sí sigue sin transporte real (sin `main`/CLI de Core,
-   hallazgo de Fase 12) — eso permanece pendiente, distinto del canal Execution↔Secrets Broker ya
-   resuelto.
+   canal Core↔Secrets Broker de DEC-010 en sí sigue sin transporte real, pero ya no está
+   "pendiente" sin más → **cerrado explícitamente sin implementar, ver DEC-080 (Fase 16)**: sin
+   consumidor real, fuera de alcance de la 1.0.
+8. ~~Ningún `main`/CLI de producción real para `mcp-server`/`execution-ssh`/`connector-github`/
+   `secrets-broker`~~ → **resuelto, ver Fase 16 (`STATE.md`)**: 4 entrypoints mínimos añadidos
+   (`src/main.ts` en cada uno de esos paquetes), reutilizando el wiring ya existente.

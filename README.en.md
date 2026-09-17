@@ -79,6 +79,7 @@ well.
 | Security hardening | **Completed** (Phase 13) |
 | Testing and integration | **Completed** (Phase 14) |
 | Documentation and release | **Completed** (Phase 15) — release `0.1.0` |
+| Stable Release: real entrypoints to start the existing processes | **Completed** (Phase 16) |
 | Software implementation | **Yes — 8 real TypeScript/Node.js packages, with automated tests** |
 | Git repository | Initialized, with the full history of every phase |
 | Remote repository | `https://github.com/catlinux/AgentForge` — visibility decided as Public (DEC-076), real change pending the user's application |
@@ -111,8 +112,28 @@ Every component runs as a separate process, communicated over its own IPC channe
 Windows, Unix domain socket on Linux/macOS), with uniform fail-closed behavior on any ambiguity.
 Full detail for every decision lives in `architecture/ARCHITECTURE.en.md` (and its Spanish
 equivalent `architecture/ARCHITECTURE.md`) and in `decisions/DECISIONS.md` — over 80 approved
-decisions across 15 phases. The original Phase 0 document, `architecture/ARCHITECTURE-DRAFT.md`,
+decisions across 16 phases. The original Phase 0 document, `architecture/ARCHITECTURE-DRAFT.md`,
 is kept as a historical reference.
+
+### How to start the real processes
+
+Since Phase 16, every process package has a minimal real entrypoint (`pnpm run build` first,
+then run each one with `node dist/main.js` from its folder, or `pnpm --filter <package> exec node
+dist/main.js` from the repo root). Recommended order — the operator starts each backend
+independently **before** confirmation-requiring tools become available over MCP (DEC-047):
+
+1. `packages/secrets-broker` — Secrets Broker (creates its master key if it does not exist yet).
+2. `packages/execution-ssh` and/or `packages/connector-github` — Execution Backends (prompt for
+   confirmation on the console when required, DEC-038).
+3. `packages/mcp-server` — MCP server (speaks over stdio, meant to be launched by Claude Code or
+   another MCP client, not run directly in an interactive terminal).
+
+All data/configuration files (keys, encrypted secrets, host/account configuration, Audit Log)
+live under `AGENTFORGE_DATA_DIR` (defaults to `~/.agentforge`) — without that configuration file
+yet, each process still starts fine with an empty catalog/configuration, not an error. This is a
+functional minimum, not a production CLI with an installer, OS service management, or
+distribution packaging — that remains out of scope for 1.0 (see `architecture/ARCHITECTURE.md`
+§20, item 9).
 
 ## Core principles
 
