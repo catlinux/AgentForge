@@ -1505,6 +1505,65 @@ Format per a cada decisió futura:
 
 ---
 
+## DEC-070 — Canal real Execution Backend↔Secrets Broker (Fase 13)
+
+- Fecha: 2026-09-17
+- Contexto: identificado explícitamente en Fase 11 (ver PENDIENTE punto 7, antes de esta fase) que
+  ningún Execution Backend (`execution-ssh`, `connector-github`) tenía un canal real hacia el
+  Secrets Broker en producción — ambos usaban una función inyectada (`getSshKeySecret`/
+  `getTokenSecret`) sin implementación real, solo mockeada en tests. Fase 13 (Hardening de
+  seguridad) resuelve este hueco.
+- Opciones consideradas: (A) reutilizar el mismo patrón de transporte de DEC-010/DEC-047 (interfaz
+  agnóstica + named pipe/Unix socket con ACL de SO) con un contrato de dominio propio, mínimo y
+  exclusivo de solo-lectura (`get`), distinto del contrato completo `SecretsBrokerOperation`
+  (DEC-033) pensado para Core; (B) diseñar un canal completamente nuevo y distinto para esta
+  relación Execution↔Broker.
+- Decisión: **(A)**. Reutiliza un patrón ya probado (DEC-047) en vez de inventar un segundo
+  mecanismo de transporte con su propia superficie de riesgo. El contrato de dominio expone
+  únicamente `get(id)` — nunca `create`/`update`/`delete`/`list-metadata` — de modo que un
+  Execution Backend no puede ejercer la API completa del Broker ni siquiera si su propio proceso
+  quedara comprometido (principio de mínimo privilegio, coherente con DEC-062).
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, aprobación agrupada del PLAN completo
+  de Fase 13).
+- Consecuencias: `packages/shared/src/secrets/` gana `execution-secrets-channel.ts` (contrato de
+  dominio `ExecutionSecretsChannelRequest`/`Response`/`Client`), `execution-secrets-client.ts`
+  (`NetExecutionSecretsChannelClient`, compartido por todo Execution Backend — a diferencia de la
+  máquina de confirmación, que DEC-058 duplicó deliberadamente por paquete por llevar estado de
+  seguridad propio; este cliente no lleva estado de seguridad, solo la conexión), `channel-path.ts`
+  (`executionSecretsChannelPath`), `resolve-via-channel.ts` (`makeChannelBackedSecretResolver`,
+  glue reutilizada por ambos backends). `packages/secrets-broker/src/ipc/` gana
+  `execution-secrets-server.ts`. `startExecutionServer`/`startConnectorServer` construyen este
+  cliente real como valor por defecto cuando el llamador no inyecta `getSshKeySecret`/
+  `getTokenSecret` explícitamente — mismo patrón exacto que DEC-065 para `AuditWriter`. Verificado
+  de extremo a extremo sin mocks (`SecretStore` real + servidor IPC real + cliente IPC real)
+  durante VERIFY. **No implica ni sustituye DEC-010** (canal Core↔Secrets Broker, todavía sin
+  transporte real) — son dos canales distintos hacia el mismo Broker, con contratos de dominio
+  distintos, igual que DEC-047 (MCP-server↔Execution) es distinto de DEC-010.
+
+## DEC-071 — DEC-036 no se reabre tras el canal real Execution↔Secrets Broker (Fase 13)
+
+- Fecha: 2026-09-17
+- Contexto: se evaluó explícitamente, como parte del PLAN de esta fase, si la nueva implementación
+  real del canal Execution↔Secrets Broker (DEC-070) cambia el cálculo de riesgo que motivó DEC-036
+  (sin evidencia criptográfica de autorización Policy Engine↔Secrets Broker).
+- Opciones consideradas: (A) mantener DEC-036 sin cambios, documentando explícitamente que sigue
+  siendo la misma limitación aceptada; (B) reabrir DEC-036 y diseñar una evidencia criptográfica de
+  autorización ahora que existe un canal real que podría transportarla.
+- Decisión: **(A), no se reabre**. El canal real Execution↔Secrets Broker no cambia la topología de
+  confianza que motivó DEC-036: el Policy Engine sigue viviendo en el mismo proceso que Core
+  (DEC-029), y la decisión de autorización que llega a Execution sigue sin ninguna evidencia
+  criptográfica verificable de que provenga de una decisión de Policy Engine genuina y no de un
+  Core comprometido invocando `evaluate()` directamente. Añadir un canal de transporte no resuelve
+  ese problema de raíz — solo mueve el secreto de un proceso a otro de forma más controlada
+  (mínimo privilegio, DEC-070), sin aportar una autoridad de autorización independiente.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, aprobación agrupada del PLAN completo
+  de Fase 13).
+- Consecuencias: DEC-036 permanece exactamente como estaba, sin modificación. La limitación sigue
+  documentada explícitamente en `SECURITY.md` (actualizado en esta misma fase) y en
+  `architecture/ARCHITECTURE.md` §8.
+
+---
+
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
 
 Estas no son decisiones — son la lista de puntos que necesitan decisión antes o durante la Fase 1.
@@ -1596,10 +1655,7 @@ durante la Fase 2 o cuando corresponda):
 6. Implementación de la rama Linux/macOS del transporte IPC (DEC-010) — deliberadamente no
    implementada todavía; solo la interfaz agnóstica y la implementación Windows están previstas
    para cuando se cree el esqueleto.
-7. **Canal real Execution↔Secrets Broker en producción** (identificado durante Fase 11, DEC-061) —
-   DEC-010 solo autoriza y modela un canal Core↔Secrets Broker, sin implementación real en ningún
-   sistema operativo; ningún Execution Backend (`execution-ssh`, `connector-github`) tiene hoy una
-   forma real de obtener un secreto en producción — ambos usan una función inyectada sin
-   implementación real, solo mockeada en tests. No bloqueante para las fases ya cerradas ni para el
-   alcance de la Fase 11 (decisión explícita del usuario); candidato a resolverse en Fase 13
-   (Hardening) o en una fase dedicada.
+7. ~~Canal real Execution↔Secrets Broker en producción~~ → **resuelto, ver DEC-070 (Fase 13)**. El
+   canal Core↔Secrets Broker de DEC-010 en sí sigue sin transporte real (sin `main`/CLI de Core,
+   hallazgo de Fase 12) — eso permanece pendiente, distinto del canal Execution↔Secrets Broker ya
+   resuelto.

@@ -1,6 +1,6 @@
 # STATE.md — AgentForge
 
-**Última actualización:** 2026-09-17 (Fase 12 — Dashboard Web, INSPECT+PLAN+EXECUTE+VERIFY
+**Última actualización:** 2026-09-17 (Fase 13 — Hardening de seguridad, INSPECT+PLAN+EXECUTE+VERIFY
 completados, pendiente de autorización de commit y push)
 
 ## Proyecto
@@ -13,39 +13,54 @@ copiar).
 
 ## Fase actual
 
-**Fase 12 — Dashboard Web**
+**Fase 13 — Hardening de seguridad**
 
-**Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 6 decisiones aprobadas
-(DEC-064 a DEC-069: acceso a datos por lectura directa de fichero, sin API externa nueva ni
-reabrir §14; bootstrap mínimo para que `startStdioServer`/`startExecutionServer`/
-`startConnectorServer` construyan un `AuditWriter` real por defecto; Fastify como framework HTTP;
-frontend HTML servido + JavaScript mínimo sin toolchain de build; sin autenticación, bind exclusivo
-a `127.0.0.1`; convención `AGENTFORGE_DATA_DIR` extendida a las rutas de configuración de
-Registry/Discovery/Policy). Durante EXECUTE se verificó, y se consultó explícitamente al usuario
-antes de resolver, que ningún paquete tenía un `main`/CLI real que instanciara `AuditWriter` con
-una ruta de fichero real, ni convención de ruta real para Registry/Discovery/Policy — solo se
-usaban rutas de test en ambos casos, sin excepción. Ver `decisions/DECISIONS.md` para el registro
-formal.
+**Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 2 decisiones aprobadas
+(DEC-070: canal real Execution Backend↔Secrets Broker, mismo patrón de transporte que DEC-010/047,
+contrato de dominio propio exclusivamente `get` de solo lectura; DEC-071: DEC-036 no se reabre — el
+canal real no cambia la topología de confianza Policy Engine↔Core). Además de las 2 decisiones,
+esta fase incluyó una revisión de seguridad manual sistemática de los 7 paquetes (delegada a un
+agente especializado, con verificación posterior de cada hallazgo antes de aplicarlo) que encontró
+y corrigió 2 defectos reales — ver "Implementación" abajo. Ver `decisions/DECISIONS.md` para el
+registro formal.
 
-**Implementación:** paquete nuevo `packages/dashboard/` completo (servidor Fastify, 3 rutas GET de
-solo lectura — `/api/audit`, `/api/tools/registry`, `/api/tools/discovery`, `/api/policy` —,
-lectores que reutilizan `FileToolRegistryStore`/`discoverTools`/`loadPolicyConfig` ya existentes de
-`packages/core`, frontend estático HTML/CSS/JS sin build); `packages/shared/src/paths/` nuevo
-(`resolveAuditLogPath` movido desde `audit/`, más `resolveRegistryCachePath`/
-`resolveDiscoveryConfigPath`/`resolvePolicyConfigPath`); `startStdioServer` (mcp-server),
-`startExecutionServer` (execution-ssh), `startConnectorServer` (connector-github) ahora construyen
-un `AuditWriter` por defecto si no se les inyecta uno explícitamente. **Ningún sistema remoto real
-tocado** — el Dashboard se verificó con fixtures generadas a mano (no existe ninguna ejecución de
-proceso real todavía en el proyecto, ver limitación abajo). Fases 3 a 11 siguen vigentes sin
-cambios estructurales — solo el hueco de wiring de `AuditWriter` cerrado con un valor por defecto.
+**Implementación:** `packages/shared/src/secrets/` gana `execution-secrets-channel.ts` (contrato
+de dominio), `execution-secrets-client.ts` (`NetExecutionSecretsChannelClient`, compartido por todo
+Execution Backend), `channel-path.ts`, `resolve-via-channel.ts`
+(`makeChannelBackedSecretResolver`); `packages/secrets-broker/src/ipc/` gana
+`execution-secrets-server.ts`; `startExecutionServer`/`startConnectorServer` construyen este
+cliente real como valor por defecto cuando no se inyecta `getSshKeySecret`/`getTokenSecret`
+explícitamente (mismo patrón que DEC-065 para `AuditWriter`). Verificado de extremo a extremo sin
+mocks (`SecretStore` real + servidor IPC real + cliente IPC real, incluida una verificación
+explícita de que dos peticiones concurrentes para hosts/cuentas distintos nunca cruzan sus
+secretos). `SECURITY.md` reescrito por completo para reflejar el estado real de implementación de
+las Fases 1-13 — corrige una afirmación obsoleta de la Fase 0.5 que decía "ninguno de estos
+mecanismos está implementado todavía".
 
-**Limitación heredada, documentada explícitamente (no introducida por esta fase):** ningún paquete
-tiene todavía un `main`/CLI/`bin` real que arranque `mcp-server`/`execution-ssh`/
-`connector-github` como proceso de producción — son funciones de librería (`createMcpServer`/
-`startStdioServer`, `startExecutionServer`, `startConnectorServer`) con dependencias completamente
-inyectadas. El Dashboard de esta fase, por tanto, no tiene hoy ningún dato real de una ejecución en
-curso que mostrar — se verificó funcionalmente con ficheros de fixture generados a mano. Construir
-ese bootstrap de producción es candidato a una fase futura, no de esta.
+**Dos defectos reales encontrados y corregidos durante la revisión de seguridad sistemática:**
+1. **Fail-closed real en los servidores IPC** (`execution-server.ts`, `connector-server.ts`): un
+   mensaje JSON sintácticamente válido pero con forma inesperada (p. ej. `{"kind":"execute"}` sin
+   `request`) hacía que la desestructuración lanzara un `TypeError` fuera de cualquier `try`,
+   dentro de una llamada `void handleLine(...)` fire-and-forget — eso se convierte en un
+   `unhandledRejection` que tumba el proceso Execution/Connector completo en Node.js moderno,
+   rompiendo la garantía fail-closed que el propio docstring de la función prometía. Corregido
+   envolviendo todo el cuerpo (tras el parseo JSON) en un try/catch que responde `ok:false` en vez
+   de propagar. Tests nuevos que reproducen exactamente ese mensaje y confirman que el servidor
+   sigue vivo después.
+2. **Condición de carrera con cruce de secretos** (`execution-secrets-client.ts`): un único
+   `NetExecutionSecretsChannelClient` (un solo socket) se comparte entre todas las peticiones
+   `execute` concurrentes de un mismo proceso servidor; sin identificador de correlación en el
+   protocolo, dos peticiones `get()` simultáneas podían resolver la promesa equivocada —
+   entregando el secreto de un host/cuenta a la petición de otro. Corregido con una cola FIFO
+   interna en el cliente (una petición en vuelo a la vez sobre el mismo socket, sin cambiar el
+   protocolo del canal). Test nuevo que fuerza explícitamente el entrelazado (respuesta lenta para
+   un id, rápida para otro) y confirma que cada llamador recibe su propio secreto — verificado
+   que este test falla de forma real y reproducible contra la versión sin corregir antes de
+   aplicar el fix.
+
+**Ningún sistema remoto real tocado.** Fases 1-12 siguen vigentes sin cambios estructurales — solo
+el hueco de wiring de secretos cerrado con una implementación real, y 2 correcciones de robustez
+sobre código ya existente (servidores IPC de Fase 7/11, cliente nuevo de esta misma fase).
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
@@ -57,12 +72,13 @@ APROBADO E IMPLEMENTADO (Fase 5: DEC-023 a DEC-029) + SECRETS BROKER APROBADO E 
 DEC-042) + INTEGRACIÓN MCP APROBADA E IMPLEMENTADA (Fase 8: DEC-043 a DEC-047) + SESSIONS
 APROBADAS E IMPLEMENTADAS (Fase 9: DEC-048 a DEC-051) + AUDIT LOG APROBADO E IMPLEMENTADO
 (Fase 10: DEC-052 a DEC-057) + CONNECTORS APROBADO E IMPLEMENTADO (Fase 11: DEC-058 a DEC-063) +
-DASHBOARD WEB APROBADO E IMPLEMENTADO (Fase 12: DEC-064 a DEC-069). Resto documentado como
-PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
+DASHBOARD WEB APROBADO E IMPLEMENTADO (Fase 12: DEC-064 a DEC-069) + HARDENING DE SEGURIDAD
+APROBADO E IMPLEMENTADO (Fase 13: DEC-070 a DEC-071). Resto documentado como PROPOSAL/OPEN QUESTION
+en `architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 12 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
+Fase 13 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
 y de autorización explícita y separada de `git commit` y `git push` (todavía no solicitadas ni
 concedidas para esta fase).
 
@@ -968,6 +984,56 @@ decisión automática.
       `packages/shared/src/paths/` sin trackear). **Pendiente:** autorización explícita y separada
       de `git commit` y de `git push` — todavía no concedidas.
 
+### Fase 13 — Hardening de seguridad (INSPECT + PLAN + EXECUTE + VERIFY completados, 2026-09-17)
+- [x] INSPECT completo: roadmap/estado real coinciden; identificada la Fase 13 como siguiente
+      pendiente; inventario de limitaciones de seguridad ya documentadas en fases previas (DEC-036,
+      canal Execution↔Secrets Broker sin implementación real ya señalado explícitamente en Fase 11
+      como candidato a esta fase, rama Linux/macOS de DEC-010 sin implementar, tests de permisos
+      POSIX omitidos en Windows, `SECURITY.md` completamente desactualizado desde Fase 0.5).
+- [x] PLAN presentado y aprobado en una sola ronda, incluyendo DEC-F (canal real Execution↔Secrets
+      Broker) y DEC-G (no reabrir DEC-036) — alcance: cerrar huecos ya documentados, actualizar
+      `SECURITY.md`, revisión de seguridad manual sistemática de los 7 paquetes; fuera de alcance:
+      rama Linux/macOS de DEC-010, `main`/CLI de producción real, features nuevas no solicitadas
+      (rotación de secretos, CA SSH, OAuth, rate limiting), sistemas remotos reales.
+- [x] **DEC-070** — Canal real Execution Backend↔Secrets Broker: mismo patrón de transporte que
+      DEC-010/047, contrato de dominio propio y minimalista, exclusivamente `get` de solo lectura.
+- [x] **DEC-071** — DEC-036 no se reabre: el canal real no cambia la topología de confianza Policy
+      Engine↔Core.
+- [x] `decisions/DECISIONS.md`, `STATE.md`, `ROADMAP.md`, `DEVELOPMENT.md`,
+      `architecture/ARCHITECTURE.md`/`.en.md` (§8), `SECURITY.md` sincronizados con DEC-070/071.
+- [x] Implementación del canal (detallada en "Fase actual" arriba): contrato de dominio, cliente
+      compartido, servidor en Secrets Broker, wiring por defecto en ambos Execution Backends,
+      verificación E2E sin mocks incluyendo concurrencia sin cruce de secretos.
+- [x] **Revisión de seguridad manual sistemática** (delegada a un agente especializado, con
+      verificación independiente de cada hallazgo antes de reportarlo — mismo criterio que la
+      revisión final de Fase 7): 7 paquetes revisados centrándose en 5 categorías (construcción de
+      comandos/strings interpretables, fuga de datos sensibles en logs/auditoría, validación de
+      entrada insuficiente en IPC, condiciones de carrera en la nueva integración, otros patrones
+      similares al bug histórico de `argv.join(" ")` de Fase 7). Resultado: 2 hallazgos reales
+      confirmados y corregidos (detallados en "Fase actual" arriba); sin hallazgos en construcción
+      de comandos/URLs (ya correctamente resuelto desde Fase 7/11) ni en fuga de secretos en
+      logs/auditoría (minimización de DEC-055 y catch-all genéricos de Fase 6 siguen intactos).
+- [x] Cada hallazgo verificado de forma independiente antes de aplicar la corrección: para el
+      defecto de concurrencia, se confirmó explícitamente que el test nuevo falla de forma
+      reproducible (`slow` recibe el valor de `fast`) contra la versión sin cola FIFO antes de
+      restaurar la versión corregida — no se aceptó el hallazgo del agente sin reproducirlo.
+- [x] Alcance respetado: no se reabrió ninguna DEC de Fases 1-12 salvo la confirmación explícita
+      (sin cambios) de DEC-036 vía DEC-071; `OperationHashRegistry`, Policy Engine, Registry,
+      Discovery, Dashboard sin tocar; no se implementó rama Linux/macOS de DEC-010 ni ningún
+      `main`/CLI de producción; ningún sistema remoto real tocado.
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 7 paquetes; `pnpm run lint` sin errores
+      (tras corregir 2 avisos de variable no usada en tests, usando `void` en vez de destructuring
+      descartado); `pnpm run format` correcto; `pnpm run test` — 250/252 correctos (2 omitidos en
+      Windows, heredados de Fase 6), incluidos 16 tests nuevos (contrato/cliente/servidor del
+      canal de secretos, 2 tests de wiring por defecto, 4 tests de fail-closed real, 1 test de
+      concurrencia sin cruce de secretos); `pnpm run build` correcto en los 7 paquetes; `pnpm
+      install --frozen-lockfile` correcto (sin dependencias nuevas); grep de secretos/`console.*`/
+      hosts reales del proyecto sin coincidencias; verificación manual E2E sin mocks (2 rondas:
+      canal básico get/record, y concurrencia con 2 hosts distintos simultáneos sin cruce);
+      `git status` revisado en su totalidad (9 ficheros modificados, 8 ficheros nuevos, coincide
+      exactamente con la implementación descrita). **Pendiente:** autorización explícita y
+      separada de `git commit` y de `git push` — todavía no concedidas.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -1077,6 +1143,8 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-067** — Dashboard: frontend HTML servido + JS mínimo, sin toolchain de build.
 - **DEC-068** — Dashboard: sin autenticación, bind exclusivo a localhost.
 - **DEC-069** — Dashboard: convención de ruta real para configuración de Registry/Discovery/Policy.
+- **DEC-070** — Canal real Execution Backend↔Secrets Broker, contrato de dominio exclusivo `get`.
+- **DEC-071** — DEC-036 no se reabre tras el canal real Execution↔Secrets Broker.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -1168,39 +1236,44 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `b301606a2e4f1215a257516f878022d70dbaab0c` (corto: `b301606`)
+- Hash: `63cf9e21602459ebf004f7fd1d0f89eced45248f` (corto: `63cf9e2`) — Fase 12, último commit real
+  en `origin/master` al momento de escribir esto.
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `feat+docs: implementa Connectors (GitHub) — Fase 11 (DEC-058 a DEC-063)`
-- Commits anteriores: `8d6670e` (correcciones Fase 10 tras revisión de código real), `30ee62a`
-  (Fase 10 — primera implementación), `5c4833d` (Fase 9), `6bdec65` (Fase 8), `86571b7` (Fase 7),
-  `b48670d` (Fase 6), `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053` (Fase 3), `4e01064`
-  (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
-- **Los cambios de la Fase 12 (Dashboard Web, DEC-064 a DEC-069) están en el working tree, sin
-  commitear todavía** — pendientes de autorización explícita y separada de `git commit`/`git push`.
+- Mensaje: `feat+docs: implementa Dashboard Web — Fase 12 (DEC-064 a DEC-069)`
+- Commits anteriores: `b301606` (Fase 11), `8d6670e` (correcciones Fase 10 tras revisión de código
+  real), `30ee62a` (Fase 10 — primera implementación), `5c4833d` (Fase 9), `6bdec65` (Fase 8),
+  `86571b7` (Fase 7), `b48670d` (Fase 6), `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053`
+  (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 +
+  Fase 0.5).
+- **Los cambios de la Fase 13 (Hardening de seguridad, DEC-070 a DEC-071) están en el working
+  tree, sin commitear todavía** — pendientes de autorización explícita y separada de
+  `git commit`/`git push`.
 
 ## Estado del push
 
-- `master` sincronizado con `origin/master` en `b301606` (Fase 11) al inicio de esta sesión.
-  Los cambios de la Fase 12 son locales, todavía sin commitear ni pushear.
+- `master` sincronizado con `origin/master` en `63cf9e2` (Fase 12) al inicio de esta fase. Los
+  cambios de la Fase 13 son locales, todavía sin commitear ni pushear.
 
 ## Próxima acción recomendada
 
-1. **Fase 11 (Connectors) está cerrada**: 6 decisiones aprobadas (DEC-058 a DEC-063), implementada,
-   verificada, commiteada y pusheada (`b301606`).
-2. **Fase 12 (Dashboard Web) completada localmente** — INSPECT + PLAN + EXECUTE + VERIFY
-   completados (2026-09-17): 6 decisiones aprobadas (DEC-064 a DEC-069), paquete nuevo
-   `packages/dashboard/` implementado y verificado (typecheck/lint/format/test/build limpios,
-   verificación manual funcional contra fixtures). Pendiente de presentar el resultado de VERIFY
-   al usuario y de autorización explícita y separada de `git commit` y `git push` — todavía no
+1. **Fase 13 (Hardening de seguridad) completada localmente** — INSPECT + PLAN + EXECUTE + VERIFY
+   completados (2026-09-17): 2 decisiones aprobadas (DEC-070, DEC-071), canal real Execution↔
+   Secrets Broker implementado, 2 defectos reales de seguridad encontrados y corregidos tras
+   revisión sistemática, `SECURITY.md` reescrito. Pendiente de presentar el resultado de VERIFY al
+   usuario y de autorización explícita y separada de `git commit` y `git push` — todavía no
    solicitadas ni concedidas.
+2. Siguiente fase pendiente del ROADMAP tras cerrar la Fase 13: **Fase 14 — Testing e
+   integración**.
 3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
    `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`; el transporte IPC real Core↔Secrets
-   Broker (DEC-010) sigue sin implementar (distinto del canal MCP↔Execution de DEC-047, ya
-   implementado); el usuario de sistema dedicado en cada host remoto (`ARCHITECTURE.md` §9 OPEN
-   QUESTION) sigue sin resolver — no se puede implementar sin tocar esos sistemas, prohibido hasta
-   autorización explícita; ningún paquete tiene todavía un `main`/CLI de producción real (hallazgo
-   de la Fase 12, ver DEC-065/069) — candidato a una fase futura dedicada.
+   Broker (DEC-010) sigue sin implementar (distinto del canal Execution↔Secrets Broker de DEC-070,
+   ya implementado, y del canal MCP↔Execution de DEC-047, ya implementado); el usuario de sistema
+   dedicado en cada host remoto (`ARCHITECTURE.md` §9 OPEN QUESTION) sigue sin resolver — no se
+   puede implementar sin tocar esos sistemas, prohibido hasta autorización explícita; ningún
+   paquete tiene todavía un `main`/CLI de producción real (hallazgo de la Fase 12, ver DEC-065/069)
+   — candidato a una fase futura dedicada; rama Linux/macOS del transporte IPC (DEC-010) sin
+   implementar.
 
 ## Cómo reprender este trabajo
 

@@ -6,12 +6,19 @@ import type {
   OperationId,
   SessionId,
 } from "@agentforge/shared";
-import { AuditWriter as AuditWriterImpl, resolveAuditLogPath } from "@agentforge/shared";
+import {
+  AuditWriter as AuditWriterImpl,
+  resolveAuditLogPath,
+  NetExecutionSecretsChannelClient,
+  makeChannelBackedSecretResolver,
+  executionSecretsChannelPath,
+} from "@agentforge/shared";
 import { execute, type ExecuteDependencies } from "../execute.js";
 import { cancelOperation } from "../confirmation/cancel.js";
 import { computeOperationHash } from "../confirmation/operation-hash.js";
 import type { OperationHashRegistry } from "../confirmation/hash-registry.js";
 import { PendingConfirmations } from "../confirmation/pending-confirmations.js";
+import { findHost } from "../config/host-config.js";
 
 type IncomingMessage =
   | { readonly kind: "execute"; readonly request: ExecutionChannelRequest }
@@ -39,7 +46,12 @@ type IncomingMessage =
  * never affects the fail-closed behavior above (DEC-057, best effort).
  */
 export function startExecutionServer(
-  deps: ExecuteDependencies & { readonly confirmationRegistry: OperationHashRegistry },
+  deps: Omit<ExecuteDependencies, "getSshKeySecret"> & {
+    readonly confirmationRegistry: OperationHashRegistry;
+    /** Optional (Fase 13, DEC-F): when omitted, defaults to a real Secrets Broker channel client
+     * instead of requiring every caller to supply one — see `resolvedGetSshKeySecret` below. */
+    readonly getSshKeySecret?: ExecuteDependencies["getSshKeySecret"];
+  },
   socketPath: string,
   auditWriter?: AuditWriter,
 ): Server {
@@ -51,6 +63,30 @@ export function startExecutionServer(
   // not inject one, instead of silently writing no audit events at all.
   const resolvedAuditWriter =
     auditWriter ?? new AuditWriterImpl(resolveAuditLogPath("execution-ssh"));
+  // Fase 13 (DEC-F): default to a real Secrets Broker channel client when the caller does not
+  // inject `getSshKeySecret` explicitly, instead of leaving it as a mocked stub with no real
+  // implementation. Connects lazily on first use — `startExecutionServer` itself stays
+  // synchronous and never blocks its own startup on the Secrets Broker being reachable; a request
+  // arriving before the Broker is up simply fails closed via the channel client's own
+  // fail-closed `connect()`/`get()` behavior.
+  const resolvedGetSshKeySecret =
+    deps.getSshKeySecret ??
+    (() => {
+      const channel = new NetExecutionSecretsChannelClient(executionSecretsChannelPath());
+      let connected: Promise<void> | undefined;
+      const resolver = makeChannelBackedSecretResolver(channel, (hostId) => {
+        return findHost(deps.config, hostId)?.sshKeySecretId;
+      });
+      return async (hostId: string) => {
+        connected ??= channel.connect();
+        try {
+          await connected;
+        } catch {
+          return undefined;
+        }
+        return resolver(hostId);
+      };
+    })();
   const server = createServer((socket: Socket) => {
     let buffer = "";
     socket.on("data", (chunk) => {
@@ -62,7 +98,13 @@ export function startExecutionServer(
         const line = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
         if (line.trim().length === 0) continue;
-        void handleLine(line, socket, deps, pendingConfirmations, resolvedAuditWriter);
+        void handleLine(
+          line,
+          socket,
+          { ...deps, getSshKeySecret: resolvedGetSshKeySecret },
+          pendingConfirmations,
+          resolvedAuditWriter,
+        );
       }
     });
     socket.on("error", () => {
@@ -89,6 +131,27 @@ async function handleLine(
     return;
   }
 
+  // Fase 13 (hardening): a syntactically valid JSON message with an unexpected shape (e.g.
+  // `{"kind":"execute"}` with no `request`, or `request: null`) must never crash this process —
+  // this whole body runs from `void handleLine(...)` (fire-and-forget, no caller try/catch), so
+  // any unguarded throw here becomes an unhandled promise rejection that terminates the process
+  // in modern Node.js. Every branch below already assumed a well-formed `IncomingMessage`; this
+  // wrapper is the actual fail-closed guarantee the docstring above promises, not just the
+  // JSON.parse guard.
+  try {
+    await handleMessage(message, socket, deps, pendingConfirmations, auditWriter);
+  } catch {
+    writeResponse(socket, { ok: false, reason: "Malformed request" });
+  }
+}
+
+async function handleMessage(
+  message: IncomingMessage,
+  socket: Socket,
+  deps: ExecuteDependencies & { readonly confirmationRegistry: OperationHashRegistry },
+  pendingConfirmations: PendingConfirmations,
+  auditWriter: AuditWriter | undefined,
+): Promise<void> {
   if (message.kind === "cancel") {
     // Determine, before mutating the registry, whether a confirmation was actually pending for
     // this exact operation tuple. `OperationHashRegistry` itself cannot answer this — it only

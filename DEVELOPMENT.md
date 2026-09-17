@@ -231,6 +231,25 @@ ver `decisions/DECISIONS.md`.
   librería, nunca invocadas como proceso real fuera de test. El Dashboard de esta fase se verifica
   con fixtures generadas a mano, no con datos de una ejecución real.
 
+**DECIDIDO (DEC-070 a DEC-071, Fase 13, 2026-09-17):** canal real Execution Backend↔Secrets Broker
+y revisión/DEC-036 — ver `decisions/DECISIONS.md`.
+
+- **Canal Execution↔Secrets Broker:** mismo patrón de transporte que DEC-010/047 (interfaz
+  agnóstica + named pipe/Unix socket con ACL de SO), contrato de dominio propio y minimalista
+  (`packages/shared/src/secrets/execution-secrets-channel.ts`) que expone únicamente `get` de solo
+  lectura — nunca la API completa del Secrets Broker (DEC-070). `startExecutionServer`/
+  `startConnectorServer` construyen un cliente real por defecto cuando no se inyecta
+  `getSshKeySecret`/`getTokenSecret` explícitamente, mismo patrón que `AuditWriter` (DEC-065).
+- **DEC-036 no se reabre:** el canal real no cambia la topología de confianza Policy Engine↔Core
+  (DEC-071) — sigue documentada la misma limitación de seguridad.
+- **Revisión de seguridad sistemática:** 2 defectos reales encontrados y corregidos — mensaje IPC
+  con forma inesperada podía tumbar el proceso servidor (ahora envuelto en un guard fail-closed);
+  condición de carrera en el cliente del nuevo canal podía cruzar secretos de peticiones
+  concurrentes (corregida con una cola FIFO por cliente). Ambos con test que reproduce el fallo
+  original antes de corregir.
+- **`SECURITY.md` actualizado**: refleja el estado real de implementación por primera vez desde su
+  creación en Fase 0.5 — ya no describe únicamente principios sin código detrás.
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando

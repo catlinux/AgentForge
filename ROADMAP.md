@@ -23,7 +23,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 10 | Audit Log | **Completada** — 6 decisiones aprobadas (DEC-052 a DEC-057) |
 | 11 | Connectors | **Completada** — 6 decisiones aprobadas (DEC-058 a DEC-063) |
 | 12 | Dashboard Web | **Completada** — 6 decisiones aprobadas (DEC-064 a DEC-069) |
-| 13 | Hardening de seguridad | Propuesta, no iniciada |
+| 13 | Hardening de seguridad | **Completada** — 2 decisiones aprobadas (DEC-070, DEC-071) |
 | 14 | Testing e integración | Propuesta, no iniciada |
 | 15 | Documentación y release | Propuesta, no iniciada |
 | 16 | Stable Release | Propuesta, no iniciada |
@@ -150,7 +150,19 @@ de ellas.
   `AGENTFORGE_DATA_DIR` extendida a las rutas de configuración de Registry/Discovery/Policy (mismo
   hueco heredado, resuelto solo para lectura). Paquete nuevo `packages/dashboard`. Sin ejecución,
   sin gestión de secretos, sin edición — puro solo-lectura en esta fase.
-- **Fase 13 — Hardening de seguridad**: revisión y refuerzo de seguridad de todo lo anterior.
+- **Fase 13 — Hardening de seguridad**: revisión y refuerzo de seguridad de todo lo anterior. 2
+  decisiones aprobadas (DEC-070, DEC-071, ver `decisions/DECISIONS.md`): canal real Execution
+  Backend↔Secrets Broker (mismo patrón de transporte que DEC-010/047, contrato de dominio propio,
+  minimalista, exclusivamente `get` de solo lectura — nunca `create`/`update`/`delete`); DEC-036 no
+  se reabre (el canal real no cambia la topología de confianza Policy Engine↔Core). Además:
+  `SECURITY.md` reescrito para reflejar el estado real de implementación de las Fases 1-13 (ya no
+  afirma que "nada está implementado"); revisión de seguridad manual sistemática de los 7 paquetes
+  que encontró y corrigió 2 defectos reales — (1) un mensaje IPC sintácticamente válido pero con
+  forma inesperada podía tumbar el proceso Execution/Connector completo (excepción no capturada
+  fuera de cualquier `try`, en una llamada fire-and-forget); (2) una condición de carrera real en
+  el cliente del nuevo canal de secretos podía cruzar el secreto de una petición con el de otra
+  bajo peticiones concurrentes — corregida con una cola FIFO. Ambos verificados con tests que
+  reproducen el fallo original antes de la corrección.
 - **Fase 14 — Testing e integración**: pruebas automatizadas y de integración end-to-end.
 - **Fase 15 — Documentación y release**: preparación de release pública/interna.
 - **Fase 16 — Stable Release**: primera versión estable.

@@ -4,9 +4,16 @@ import type {
   ExecutionChannelRequest,
   ExecutionChannelResponse,
   OperationId,
+  SecretId,
   SessionId,
 } from "@agentforge/shared";
-import { AuditWriter as AuditWriterImpl, resolveAuditLogPath } from "@agentforge/shared";
+import {
+  AuditWriter as AuditWriterImpl,
+  resolveAuditLogPath,
+  NetExecutionSecretsChannelClient,
+  makeChannelBackedSecretResolver,
+  executionSecretsChannelPath,
+} from "@agentforge/shared";
 import { execute, type ExecuteDependencies } from "../execute.js";
 import { cancelOperation } from "../confirmation/cancel.js";
 import { computeOperationHash } from "../confirmation/operation-hash.js";
@@ -34,7 +41,12 @@ type IncomingMessage =
  * Any malformed message or internal error responds with `ok: false` — fail closed, same as SSH.
  */
 export function startConnectorServer(
-  deps: ExecuteDependencies & { readonly confirmationRegistry: OperationHashRegistry },
+  deps: Omit<ExecuteDependencies, "getTokenSecret"> & {
+    readonly confirmationRegistry: OperationHashRegistry;
+    /** Optional (Fase 13, DEC-F): when omitted, defaults to a real Secrets Broker channel client
+     * instead of requiring every caller to supply one — see `resolvedGetTokenSecret` below. */
+    readonly getTokenSecret?: ExecuteDependencies["getTokenSecret"];
+  },
   socketPath: string,
   auditWriter?: AuditWriter,
 ): Server {
@@ -43,6 +55,27 @@ export function startConnectorServer(
   // not inject one, instead of silently writing no audit events at all.
   const resolvedAuditWriter =
     auditWriter ?? new AuditWriterImpl(resolveAuditLogPath("connector-github"));
+  // Fase 13 (DEC-F): default to a real Secrets Broker channel client when the caller does not
+  // inject `getTokenSecret` explicitly. Unlike `execution-ssh`'s `getSshKeySecret(hostId)`, the
+  // caller here already passes the `SecretId` itself (`account.tokenSecretId`, resolved by
+  // execute.ts before this is ever called) — no host/account lookup needed, just the identity
+  // resolver. Connects lazily on first use, same as execution-ssh.
+  const resolvedGetTokenSecret =
+    deps.getTokenSecret ??
+    (() => {
+      const channel = new NetExecutionSecretsChannelClient(executionSecretsChannelPath());
+      let connected: Promise<void> | undefined;
+      const resolver = makeChannelBackedSecretResolver(channel, (id) => id as SecretId);
+      return async (secretId: string) => {
+        connected ??= channel.connect();
+        try {
+          await connected;
+        } catch {
+          return undefined;
+        }
+        return resolver(secretId);
+      };
+    })();
   const server = createServer((socket: Socket) => {
     let buffer = "";
     socket.on("data", (chunk) => {
@@ -52,7 +85,13 @@ export function startConnectorServer(
         const line = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
         if (line.trim().length === 0) continue;
-        void handleLine(line, socket, deps, pendingConfirmations, resolvedAuditWriter);
+        void handleLine(
+          line,
+          socket,
+          { ...deps, getTokenSecret: resolvedGetTokenSecret },
+          pendingConfirmations,
+          resolvedAuditWriter,
+        );
       }
     });
     socket.on("error", () => {
@@ -79,6 +118,27 @@ async function handleLine(
     return;
   }
 
+  // Fase 13 (hardening): a syntactically valid JSON message with an unexpected shape (e.g.
+  // `{"kind":"execute"}` with no `request`, or `request: null`) must never crash this process —
+  // this whole body runs from `void handleLine(...)` (fire-and-forget, no caller try/catch), so
+  // any unguarded throw here becomes an unhandled promise rejection that terminates the process
+  // in modern Node.js. Every branch below already assumed a well-formed `IncomingMessage`; this
+  // wrapper is the actual fail-closed guarantee the docstring above promises, not just the
+  // JSON.parse guard. Same fix as execution-ssh's execution-server.ts.
+  try {
+    await handleMessage(message, socket, deps, pendingConfirmations, auditWriter);
+  } catch {
+    writeResponse(socket, { ok: false, reason: "Malformed request" });
+  }
+}
+
+async function handleMessage(
+  message: IncomingMessage,
+  socket: Socket,
+  deps: ExecuteDependencies & { readonly confirmationRegistry: OperationHashRegistry },
+  pendingConfirmations: PendingConfirmations,
+  auditWriter: AuditWriter | undefined,
+): Promise<void> {
   if (message.kind === "cancel") {
     const hadPendingConfirmation = pendingConfirmations.has(
       computeOperationHash(

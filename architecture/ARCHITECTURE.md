@@ -325,7 +325,21 @@ actuar como autoridad independiente frente a un Core comprometido — el Secrets
 almacenamiento y evita el acceso directo a los secretos fuera de su propio proceso, pero no puede
 impedir que un Core comprometido obtenga secretos a través del flujo de autorización legítimo ya
 disponible. Cerrar esa brecha exigiría separar Policy Engine de Core en otro proceso — decisión
-mayor, no tomada aquí, candidata a una futura fase de hardening (Fase 13).
+mayor, no tomada.
+
+**DECISIÓN (DEC-070 a DEC-071, Fase 13 — Hardening de seguridad):** revisada explícitamente la
+limitación de DEC-036 tras implementar un canal real Execution Backend↔Secrets Broker —
+**confirmada sin cambios (DEC-071)**: un canal de transporte no aporta una autoridad de
+autorización independiente, solo mueve el secreto de forma más controlada. Implementado
+(DEC-070) el canal real que faltaba: `execution-ssh` y `connector-github` ya no reciben el secreto
+vía una función inyectada mockeada, sino vía un cliente IPC real
+(`NetExecutionSecretsChannelClient`, `packages/shared/src/secrets/`) contra un servidor real en el
+Secrets Broker (`execution-secrets-server.ts`), mismo patrón de transporte que DEC-010/DEC-047 con
+un contrato de dominio propio, exclusivamente `get` de solo lectura — un Execution Backend no
+puede crear, modificar, eliminar ni enumerar secretos ni siquiera si su propio proceso quedara
+comprometido. Verificado de extremo a extremo sin mocks. El canal Core↔Secrets Broker de DEC-010
+en sí sigue sin transporte real (ningún `main`/CLI de Core existe todavía, hallazgo de Fase 12) —
+limitación distinta, no resuelta por esta fase.
 
 **PROPOSAL (contexto histórico, Fase 1 — ver DEC-030 a DEC-036 arriba para lo ya decidido, incluida
 la corrección sobre el mecanismo de almacenamiento):**

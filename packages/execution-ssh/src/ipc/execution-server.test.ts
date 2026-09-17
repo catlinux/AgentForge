@@ -117,6 +117,44 @@ describe("startExecutionServer (DEC-047)", () => {
     socket.destroy();
   });
 
+  it("syntactically valid but unexpectedly-shaped 'execute' message responds ok:false and never crashes the process (Fase 13 hardening)", async () => {
+    const deps = makeDeps();
+    server = startExecutionServer(deps, socketPath);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const socket = connect(socketPath);
+    await new Promise((r) => socket.once("connect", r));
+    // No `request` field at all — destructuring it inside the execute branch used to throw
+    // unguarded, turning into an unhandled promise rejection that terminates the process.
+    socket.write(`${JSON.stringify({ kind: "execute" })}\n`);
+
+    const line = await readOneLine(socket);
+    expect(JSON.parse(line)).toEqual({ ok: false, reason: "Malformed request" });
+
+    // The server must still be alive and answer a second, well-formed request afterwards.
+    socket.write("not valid json\n");
+    const secondLine = await readOneLine(socket);
+    expect(JSON.parse(secondLine)).toEqual({ ok: false, reason: "Malformed request" });
+    socket.destroy();
+  });
+
+  it("syntactically valid but unexpectedly-shaped 'cancel' message never crashes the process (Fase 13 hardening)", async () => {
+    const deps = makeDeps();
+    server = startExecutionServer(deps, socketPath);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const socket = connect(socketPath);
+    await new Promise((r) => socket.once("connect", r));
+    // "cancel" carries no acknowledgement response by design (DEC-045), so we can only prove the
+    // server survived by sending a second, well-formed message afterwards and getting a reply.
+    socket.write(`${JSON.stringify({ kind: "cancel", identity, hostId: "host-1" })}\n`);
+    socket.write("not valid json\n");
+
+    const line = await readOneLine(socket);
+    expect(JSON.parse(line)).toEqual({ ok: false, reason: "Malformed request" });
+    socket.destroy();
+  });
+
   it("execute request with deny verdict never contacts the Secrets Broker", async () => {
     let secretRequested = false;
     const deps = {
@@ -328,6 +366,16 @@ describe("startExecutionServer default audit writer (DEC-065)", () => {
   it("starts successfully without throwing when no auditWriter is injected", () => {
     const deps = makeDeps();
     const server = startExecutionServer(deps, testSocketPath());
+    expect(server.listening).toBe(true);
+    server.close();
+  });
+});
+
+describe("startExecutionServer default Secrets Broker channel (Fase 13, DEC-F)", () => {
+  it("starts successfully without throwing when no getSshKeySecret is injected", () => {
+    const { getSshKeySecret, ...depsWithoutSecret } = makeDeps();
+    void getSshKeySecret;
+    const server = startExecutionServer(depsWithoutSecret, testSocketPath());
     expect(server.listening).toBe(true);
     server.close();
   });

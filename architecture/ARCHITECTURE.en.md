@@ -319,7 +319,20 @@ independent authority against a compromised Core — the Secrets Broker protects
 prevents direct access to secrets outside its own process, but it cannot prevent a compromised
 Core from obtaining secrets through the legitimate authorization flow already available to it.
 Closing that gap for real would require separating Policy Engine from Core into another process —
-a larger decision, not made here, a candidate for a future hardening phase (Phase 13).
+a larger decision, not made.
+
+**DECISION (DEC-070 to DEC-071, Phase 13 — Security hardening):** the DEC-036 limitation was
+explicitly revisited after implementing a real Execution Backend<->Secrets Broker channel —
+**confirmed unchanged (DEC-071)**: a transport channel does not provide an independent
+authorization authority, it only moves the secret around more carefully. The missing channel
+itself was implemented (DEC-070): `execution-ssh` and `connector-github` no longer receive the
+secret via a mocked injected function — they now use a real IPC client
+(`NetExecutionSecretsChannelClient`, `packages/shared/src/secrets/`) against a real server in the
+Secrets Broker (`execution-secrets-server.ts`), same transport pattern as DEC-010/DEC-047 with its
+own domain contract exposing only a read-only `get` — an Execution Backend cannot create, modify,
+delete, or enumerate secrets even if its own process were compromised. Verified end to end without
+mocks. The Core<->Secrets Broker channel of DEC-010 itself still has no real transport (no Core
+`main`/CLI exists yet, Phase 12 finding) — a distinct limitation, not resolved by this phase.
 
 **PROPOSAL (historical context, Phase 1 — see DEC-030 to DEC-036 above for what is now decided,
 including the correction on the storage mechanism):**

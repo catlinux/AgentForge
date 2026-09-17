@@ -121,6 +121,39 @@ describe("startConnectorServer (DEC-047 pattern, DEC-058)", () => {
     socket.destroy();
   });
 
+  it("syntactically valid but unexpectedly-shaped 'execute' message responds ok:false and never crashes the process (Fase 13 hardening)", async () => {
+    const deps = makeDeps();
+    server = startConnectorServer(deps, socketPath);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const socket = connect(socketPath);
+    await new Promise((r) => socket.once("connect", r));
+    socket.write(`${JSON.stringify({ kind: "execute" })}\n`);
+
+    const line = await readOneLine(socket);
+    expect(JSON.parse(line)).toEqual({ ok: false, reason: "Malformed request" });
+
+    socket.write("not valid json\n");
+    const secondLine = await readOneLine(socket);
+    expect(JSON.parse(secondLine)).toEqual({ ok: false, reason: "Malformed request" });
+    socket.destroy();
+  });
+
+  it("syntactically valid but unexpectedly-shaped 'cancel' message never crashes the process (Fase 13 hardening)", async () => {
+    const deps = makeDeps();
+    server = startConnectorServer(deps, socketPath);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const socket = connect(socketPath);
+    await new Promise((r) => socket.once("connect", r));
+    socket.write(`${JSON.stringify({ kind: "cancel", identity, hostId: "account-1" })}\n`);
+    socket.write("not valid json\n");
+
+    const line = await readOneLine(socket);
+    expect(JSON.parse(line)).toEqual({ ok: false, reason: "Malformed request" });
+    socket.destroy();
+  });
+
   it("execute request with deny verdict never contacts the Secrets Broker", async () => {
     let secretRequested = false;
     const deps = {
@@ -274,6 +307,16 @@ describe("startConnectorServer default audit writer (DEC-065)", () => {
   it("starts successfully without throwing when no auditWriter is injected", () => {
     const deps = makeDeps();
     const server = startConnectorServer(deps, testSocketPath());
+    expect(server.listening).toBe(true);
+    server.close();
+  });
+});
+
+describe("startConnectorServer default Secrets Broker channel (Fase 13, DEC-F)", () => {
+  it("starts successfully without throwing when no getTokenSecret is injected", () => {
+    const { getTokenSecret, ...depsWithoutSecret } = makeDeps();
+    void getTokenSecret;
+    const server = startConnectorServer(depsWithoutSecret, testSocketPath());
     expect(server.listening).toBe(true);
     server.close();
   });
