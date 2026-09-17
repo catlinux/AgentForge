@@ -39,11 +39,23 @@ scenario not supported by the current architecture (see "Current limitations" at
 - **Windows** (the only platform actually verified today — see section 19).
 - **Node.js** and **pnpm** (the monorepo's package manager, DEC-009, via Corepack).
 - **Claude Code** installed, if you want to connect AgentForge as an MCP server.
-- To use `execution-ssh` for real: a remote host reachable over SSH with a dedicated `ed25519` key
-  (DEC-006) — never reuse a personal key.
+- To use `execution-ssh` for real: a remote host reachable over SSH with an `ed25519` key
+  **dedicated to AgentForge** (DEC-006) — never reuse a personal key. Generate it now, before
+  going further, if you do not have one yet:
+
+  ```powershell
+  ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\agentforge_ed25519" -C "agentforge"
+  ```
+
+  This creates `agentforge_ed25519` (private key) and `agentforge_ed25519.pub` (public key) in
+  your `.ssh` folder. Add the contents of `agentforge_ed25519.pub` to `~/.ssh/authorized_keys` for
+  the remote user on your SSH host (out of scope for this guide — that is remote-host
+  configuration, not AgentForge configuration). Keep the **private** key's path — you use it in
+  section 4, where you register its contents with the Secrets Broker.
 - To use `connector-github` for real: a **Personal Access Token** from GitHub with the minimum
   permissions needed for the operations you want to use (`create_issue`, `list_issues`,
-  `comment_on_issue`).
+  `comment_on_issue`). Create it now, before going further, from GitHub → Settings → Developer
+  settings → Personal access tokens, if you do not have one yet — you also need it in section 4.
 
 ## 2. Installing the project
 
@@ -111,6 +123,10 @@ other process ever sees the plaintext value except at the moment it is used.
 you run once. This is intentional (DEC-033: no over-engineering for a single-operator use case) —
 not a hidden limitation.
 
+You need the following already created: the dedicated `ed25519` SSH private key and the GitHub
+Personal Access Token (both from section 1) — this step only registers them with the Broker, it
+does not generate them.
+
 To register a secret, write a script like this (adjust the values) and run it **once**, pointing
 at the same `AGENTFORGE_DATA_DIR` the real processes will use:
 
@@ -128,10 +144,15 @@ const masterKeyStore = new MasterKeyStore(join(dataDir, "secrets-broker", "maste
 const masterKey = await masterKeyStore.loadOrCreate();
 const store = new SecretStore(join(dataDir, "secrets-broker", "secrets.enc.json"), masterKey);
 
-// Example: SSH private key (kind "ssh-key")
+// Example: SSH private key (kind "ssh-key") — the one generated in section 1
 const sshKeyId = await store.create(
   "ssh-key",
-  { privateKey: readFileSync("C:\\path\\to\\your\\ed25519_key", "utf-8") },
+  {
+    privateKey: readFileSync(
+      join(process.env.USERPROFILE, ".ssh", "agentforge_ed25519"),
+      "utf-8",
+    ),
+  },
   undefined,
   "SSH key for my-host",
 );

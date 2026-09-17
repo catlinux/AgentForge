@@ -39,10 +39,22 @@ ningún escenario no soportado por la arquitectura actual (ver la sección "Limi
 - **Node.js** y **pnpm** (gestor de paquetes del monorepo, DEC-009, vía Corepack).
 - **Claude Code** instalado, si quieres conectar AgentForge como servidor MCP.
 - Para usar `execution-ssh` de verdad: un host remoto accesible por SSH con una clave `ed25519`
-  dedicada (DEC-006) — nunca reutilices una clave personal.
+  **dedicada a AgentForge** (DEC-006) — nunca reutilices una clave personal. Genérala ahora, antes
+  de seguir, si todavía no la tienes:
+
+  ```powershell
+  ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\agentforge_ed25519" -C "agentforge"
+  ```
+
+  Esto crea `agentforge_ed25519` (clave privada) y `agentforge_ed25519.pub` (clave pública) en tu
+  carpeta `.ssh`. Añade el contenido de `agentforge_ed25519.pub` a
+  `~/.ssh/authorized_keys` del usuario remoto en tu host SSH (fuera del alcance de este manual —
+  es configuración del host remoto, no de AgentForge). Guardas la ruta de la clave **privada**
+  para usarla en la sección 4, donde das de alta su contenido en el Secrets Broker.
 - Para usar `connector-github` de verdad: un **Personal Access Token** de GitHub con los permisos
   mínimos necesarios para las operaciones que quieras usar (`create_issue`, `list_issues`,
-  `comment_on_issue`).
+  `comment_on_issue`). Créalo ahora, antes de seguir, desde GitHub → Settings → Developer settings
+  → Personal access tokens, si todavía no lo tienes — lo necesitas también en la sección 4.
 
 ## 2. Instalación del proyecto
 
@@ -110,6 +122,9 @@ AES-256-GCM). Ningún otro proceso ve el valor en claro salvo en el momento de u
 corto que tú ejecutes una sola vez. Esto es intencional (DEC-033: sin sobrearquitectura para un
 caso de uso de un solo operador) — no es una limitación oculta.
 
+Necesitas ya creados: la clave SSH privada `ed25519` dedicada y el Personal Access Token de GitHub
+(ambos de la sección 1) — este paso solo los registra en el Broker, no los genera.
+
 Para dar de alta un secreto, crea un script así (ajusta los valores) y ejecútalo **una vez**,
 apuntando al mismo `AGENTFORGE_DATA_DIR` que usarán los procesos reales:
 
@@ -127,10 +142,15 @@ const masterKeyStore = new MasterKeyStore(join(dataDir, "secrets-broker", "maste
 const masterKey = await masterKeyStore.loadOrCreate();
 const store = new SecretStore(join(dataDir, "secrets-broker", "secrets.enc.json"), masterKey);
 
-// Ejemplo: clave SSH privada (kind "ssh-key")
+// Ejemplo: clave SSH privada (kind "ssh-key") — la generada en la sección 1
 const sshKeyId = await store.create(
   "ssh-key",
-  { privateKey: readFileSync("C:\\ruta\\a\\tu\\clave_ed25519", "utf-8") },
+  {
+    privateKey: readFileSync(
+      join(process.env.USERPROFILE, ".ssh", "agentforge_ed25519"),
+      "utf-8",
+    ),
+  },
   undefined,
   "clave SSH para mi-host",
 );
