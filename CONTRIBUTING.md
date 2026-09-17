@@ -1,14 +1,16 @@
 # Contribuir a AgentForge
 
-AgentForge es, por ahora, un proyecto personal en fase de investigación y fundamentos — todavía no
-hay código funcional ni un proceso de contribución externo activo. Este documento establece las
-convenciones que regirán las contribuciones cuando el proyecto llegue a ese punto, y las que ya
-aplican hoy a nivel de documentación.
+AgentForge es, por ahora, un proyecto personal con implementación real (8 paquetes TypeScript/
+Node.js, 13 fases completadas) pero sin un proceso de contribución externo activo — el
+repositorio existe en GitHub pero no acepta colaboradores externos todavía. Este documento
+establece las convenciones que regirán las contribuciones si el proyecto se abre en el futuro, y
+las que ya aplican hoy al trabajo interno (con o sin asistencia de Claude Code).
 
 ## Estado actual
 
-- No hay código de producción todavía (ver `STATE.md`).
-- No se ha decidido si el proyecto será público ni si aceptará contribuciones externas.
+- Hay código de producción real desde la Fase 2 en adelante (ver `STATE.md` y `packages/`).
+- El repositorio es `https://github.com/catlinux/AgentForge`; no se ha decidido si aceptará
+  contribuciones externas ni se ha confirmado explícitamente su visibilidad pública/privada.
 - No se ha decidido licencia (ver `DEVELOPMENT.md`).
 
 Hasta que estos puntos se decidan, este documento describe las convenciones de trabajo internas,
@@ -54,8 +56,10 @@ dentro de la conversación de trabajo con el usuario y quedan registrados en
 
 ## Pull requests
 
-No aplica todavía — no hay repositorio remoto ni colaboradores externos. Se documentará este
-proceso cuando el proyecto decida usar GitHub (ver `decisions/DECISIONS.md`, pendiente).
+El repositorio remoto ya existe (`https://github.com/catlinux/AgentForge`), pero no hay
+colaboradores externos todavía — todo el trabajo se hace directamente sobre `master`, con
+autorización explícita del usuario para cada `commit` y, por separado, cada `push`. Un proceso de
+PR formal se documentará aquí si el proyecto llega a aceptar contribuciones externas.
 
 ## Principios de seguridad para cualquier contribución
 
@@ -67,8 +71,19 @@ proceso cuando el proyecto decida usar GitHub (ver `decisions/DECISIONS.md`, pen
 
 ## Tests
 
-Todavía no existen tests porque no existe código funcional. Cuando se implemente software real, se
-documentarán aquí las convenciones de testing (framework, cobertura esperada, cómo ejecutarlos).
+- Framework: [Vitest](https://vitest.dev/), un fichero `*.test.ts` junto al código que prueba,
+  dentro de cada paquete de `packages/`.
+- `pnpm run test` ejecuta todos los tests unitarios/aislados de los 8 paquetes (rápido, sin
+  procesos reales del SO).
+- `pnpm run test:integration` ejecuta los tests de `tests/integration/` (Fase 14) — más lentos,
+  arrancan procesos reales del sistema operativo comunicados por los canales IPC reales del
+  proyecto; requieren `pnpm run build` antes (corren contra `dist/`, no `src/`). Ningún test, de
+  ningún tipo, toca sistemas remotos reales (Debian de casa, VPS Contabo, GitHub) — los bordes
+  externos se simulan localmente (servidor SSH/HTTP en loopback).
+- `pnpm run test:coverage` genera un reporte de cobertura de código, informativo, sin umbral que
+  bloquee ningún script (ver DEC-073 en `decisions/DECISIONS.md`).
+- Antes de dar una fase por cerrada: `pnpm run typecheck`/`lint`/`format`/`test`/`build` deben
+  pasar limpios en todos los paquetes.
 
 ## Idiomas
 

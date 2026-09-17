@@ -1,7 +1,9 @@
 # STATE.md — AgentForge
 
-**Última actualización:** 2026-09-17 (Fase 13 — Hardening de seguridad, INSPECT+PLAN+EXECUTE+VERIFY
-completados, pendiente de autorización de commit y push)
+**Última actualización:** 2026-09-17 (Fase 14 — Testing e integración, INSPECT+PLAN+EXECUTE+VERIFY
+completados, pendiente de autorización de commit y push. Además: corregida documentación de
+gobernanza — README.md/README.en.md/CHANGELOG.md/CONTRIBUTING.md/DEVELOPMENT.md llevaban
+congelados desde la Fase 0.5, señalado explícitamente por el usuario a mitad de esta fase)
 
 ## Proyecto
 
@@ -13,54 +15,45 @@ copiar).
 
 ## Fase actual
 
-**Fase 13 — Hardening de seguridad**
+**Fase 14 — Testing e integración**
 
-**Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 2 decisiones aprobadas
-(DEC-070: canal real Execution Backend↔Secrets Broker, mismo patrón de transporte que DEC-010/047,
-contrato de dominio propio exclusivamente `get` de solo lectura; DEC-071: DEC-036 no se reabre — el
-canal real no cambia la topología de confianza Policy Engine↔Core). Además de las 2 decisiones,
-esta fase incluyó una revisión de seguridad manual sistemática de los 7 paquetes (delegada a un
-agente especializado, con verificación posterior de cada hallazgo antes de aplicarlo) que encontró
-y corrigió 2 defectos reales — ver "Implementación" abajo. Ver `decisions/DECISIONS.md` para el
+**Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 3 decisiones aprobadas
+(DEC-072: tests de integración en directorio separado `tests/integration/`, workspace pnpm propio;
+DEC-073: cobertura de código `@vitest/coverage-v8`, informativa, sin umbral bloqueante; DEC-074:
+CI/CD fuera de alcance de esta fase, pospuesto a la Fase 15). Ver `decisions/DECISIONS.md` para el
 registro formal.
 
-**Implementación:** `packages/shared/src/secrets/` gana `execution-secrets-channel.ts` (contrato
-de dominio), `execution-secrets-client.ts` (`NetExecutionSecretsChannelClient`, compartido por todo
-Execution Backend), `channel-path.ts`, `resolve-via-channel.ts`
-(`makeChannelBackedSecretResolver`); `packages/secrets-broker/src/ipc/` gana
-`execution-secrets-server.ts`; `startExecutionServer`/`startConnectorServer` construyen este
-cliente real como valor por defecto cuando no se inyecta `getSshKeySecret`/`getTokenSecret`
-explícitamente (mismo patrón que DEC-065 para `AuditWriter`). Verificado de extremo a extremo sin
-mocks (`SecretStore` real + servidor IPC real + cliente IPC real, incluida una verificación
-explícita de que dos peticiones concurrentes para hosts/cuentas distintos nunca cruzan sus
-secretos). `SECURITY.md` reescrito por completo para reflejar el estado real de implementación de
-las Fases 1-13 — corrige una afirmación obsoleta de la Fase 0.5 que decía "ninguno de estos
-mecanismos está implementado todavía".
+**Pausa documental a mitad de fase (a petición explícita del usuario):** el usuario señaló que
+`README.md`, `README.en.md`, `CHANGELOG.md` y `CONTRIBUTING.md` llevaban congelados en el estado
+de la Fase 0.5 (2026-09-16) — afirmando cosas como "ninguna línea de software funcional
+implementada" o "repositorio Git no inicializado" pese a llevar 13 fases completadas y GitHub
+activo. Corregidos los 4 documentos para reflejar el estado real, además de las cabeceras
+obsoletas de `DEVELOPMENT.md` (secciones "Cómo ejecutar el proyecto", "Control de versiones",
+"Licencia", "Testing", "Variables de entorno", todas con afirmaciones de "no aplica todavía" que
+llevaban 12 fases sin actualizarse) y un comentario de código obsoleto en
+`packages/connector-github/src/execute.ts` (seguía diciendo que DEC-010 era un placeholder sin
+canal real, resuelto ya por DEC-070 en Fase 13). Retomada la implementación de la Fase 14
+inmediatamente después, sin pérdida de contexto.
 
-**Dos defectos reales encontrados y corregidos durante la revisión de seguridad sistemática:**
-1. **Fail-closed real en los servidores IPC** (`execution-server.ts`, `connector-server.ts`): un
-   mensaje JSON sintácticamente válido pero con forma inesperada (p. ej. `{"kind":"execute"}` sin
-   `request`) hacía que la desestructuración lanzara un `TypeError` fuera de cualquier `try`,
-   dentro de una llamada `void handleLine(...)` fire-and-forget — eso se convierte en un
-   `unhandledRejection` que tumba el proceso Execution/Connector completo en Node.js moderno,
-   rompiendo la garantía fail-closed que el propio docstring de la función prometía. Corregido
-   envolviendo todo el cuerpo (tras el parseo JSON) en un try/catch que responde `ok:false` en vez
-   de propagar. Tests nuevos que reproducen exactamente ese mensaje y confirman que el servidor
-   sigue vivo después.
-2. **Condición de carrera con cruce de secretos** (`execution-secrets-client.ts`): un único
-   `NetExecutionSecretsChannelClient` (un solo socket) se comparte entre todas las peticiones
-   `execute` concurrentes de un mismo proceso servidor; sin identificador de correlación en el
-   protocolo, dos peticiones `get()` simultáneas podían resolver la promesa equivocada —
-   entregando el secreto de un host/cuenta a la petición de otro. Corregido con una cola FIFO
-   interna en el cliente (una petición en vuelo a la vez sobre el mismo socket, sin cambiar el
-   protocolo del canal). Test nuevo que fuerza explícitamente el entrelazado (respuesta lenta para
-   un id, rápida para otro) y confirma que cada llamador recibe su propio secreto — verificado
-   que este test falla de forma real y reproducible contra la versión sin corregir antes de
-   aplicar el fix.
+**Implementación:** `tests/integration/` (nuevo workspace pnpm, `vitest.config.ts` propio con
+`fileParallelism: false` — cada test arranca su propio Secrets Broker en el canal fijo real de
+producción, DEC-047/070, así que dos ficheros de test no pueden correr en paralelo entre sí sin
+colisionar); `helpers/spawn-process.ts` (arranque/apagado de procesos reales, espera de señal
+`ready` en stdout); `helpers/mock-ssh-server.ts` (servidor SSH real vía `ssh2.Server`, loopback,
+claves ed25519 efímeras); `helpers/mock-github-server.ts` (servidor HTTP real vía `node:http`,
+loopback); `helpers/secrets-broker-process.mjs`/`execution-ssh-process.mjs`/
+`connector-github-process.mjs` (entrypoints de proceso solo-para-test, nunca `main`/CLI de
+producción); 2 ficheros de test (`execution-ssh-secrets-broker.test.ts`,
+`connector-github-secrets-broker.test.ts`), 4 casos en total: flujo completo real (MCP-channel↔
+Execution/Connector real↔Secrets Broker real↔borde externo simulado) y fail-closed sin Secrets
+Broker disponible, para cada uno de los dos Execution Backends. `vitest.config.ts` raíz nuevo
+(configuración de cobertura, ya que `defineWorkspace()` no la admite directamente). Script
+`pnpm run test:coverage`/`pnpm run test:integration` en el `package.json` raíz.
 
-**Ningún sistema remoto real tocado.** Fases 1-12 siguen vigentes sin cambios estructurales — solo
-el hueco de wiring de secretos cerrado con una implementación real, y 2 correcciones de robustez
-sobre código ya existente (servidores IPC de Fase 7/11, cliente nuevo de esta misma fase).
+**Ningún sistema remoto real tocado** — el servidor SSH y el servidor HTTP de los tests son
+procesos reales pero locales (loopback), nunca Debian de casa, VPS Contabo, ni la API real de
+GitHub. Fases 1-13 siguen vigentes sin cambios estructurales, salvo la corrección del comentario
+obsoleto ya mencionada.
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
@@ -73,12 +66,13 @@ DEC-042) + INTEGRACIÓN MCP APROBADA E IMPLEMENTADA (Fase 8: DEC-043 a DEC-047) 
 APROBADAS E IMPLEMENTADAS (Fase 9: DEC-048 a DEC-051) + AUDIT LOG APROBADO E IMPLEMENTADO
 (Fase 10: DEC-052 a DEC-057) + CONNECTORS APROBADO E IMPLEMENTADO (Fase 11: DEC-058 a DEC-063) +
 DASHBOARD WEB APROBADO E IMPLEMENTADO (Fase 12: DEC-064 a DEC-069) + HARDENING DE SEGURIDAD
-APROBADO E IMPLEMENTADO (Fase 13: DEC-070 a DEC-071). Resto documentado como PROPOSAL/OPEN QUESTION
-en `architecture/ARCHITECTURE.md` §20.
+APROBADO E IMPLEMENTADO (Fase 13: DEC-070 a DEC-071) + TESTING E INTEGRACIÓN APROBADO E
+IMPLEMENTADO (Fase 14: DEC-072 a DEC-074). Resto documentado como PROPOSAL/OPEN QUESTION en
+`architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 13 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
+Fase 14 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
 y de autorización explícita y separada de `git commit` y `git push` (todavía no solicitadas ni
 concedidas para esta fase).
 
@@ -1034,6 +1028,68 @@ decisión automática.
       exactamente con la implementación descrita). **Pendiente:** autorización explícita y
       separada de `git commit` y de `git push` — todavía no concedidas.
 
+### Fase 14 — Testing e integración (INSPECT + PLAN + EXECUTE + VERIFY completados, 2026-09-17)
+- [x] INSPECT completo: roadmap/estado real coinciden; identificada la Fase 14 como siguiente
+      pendiente; inventario del estado real de testing (43 ficheros de test unitarios/aislados por
+      paquete, un único precedente de integración en memoria — `mcp-server/src/server.test.ts` con
+      `InMemoryTransport` — ningún test cruza procesos reales del SO); confirmado que sigue sin
+      existir ningún `main`/CLI de producción (limita qué integración "end-to-end real" es
+      posible); sin cobertura de código configurada en ningún punto anterior; sin CI/CD en ningún
+      documento previo.
+- [x] PLAN presentado y aprobado en una sola ronda con 3 decisiones candidatas (DEC-H/I/J del
+      PLAN) — alcance: tests de integración real entre procesos, cobertura informativa; fuera de
+      alcance: `main`/CLI de producción real, CI/CD, tests contra sistemas remotos reales, refactor
+      de producción para aumentar cobertura.
+- [x] **DEC-072** — Tests de integración en directorio separado `tests/integration/`, workspace
+      pnpm propio, script `test:integration` distinto de `test`.
+- [x] **DEC-073** — Cobertura de código informativa (`@vitest/coverage-v8`), sin umbral bloqueante.
+- [x] **DEC-074** — CI/CD fuera de alcance de esta fase, pospuesto a la Fase 15.
+- [x] `decisions/DECISIONS.md`, `STATE.md`, `ROADMAP.md`, `DEVELOPMENT.md` sincronizados con
+      DEC-072 a DEC-074.
+- [x] **Pausa a mitad de EXECUTE, a petición explícita del usuario:** detectada y corregida
+      documentación de gobernanza gravemente desactualizada — `README.md`, `README.en.md`,
+      `CHANGELOG.md`, `CONTRIBUTING.md` llevaban 12 fases sin tocarse desde la Fase 0.5, con
+      afirmaciones falsas sobre el estado real del proyecto (código funcional, Git, GitHub).
+      También corregidas las cabeceras y secciones finales de `DEVELOPMENT.md` (mismo problema) y
+      un comentario de código obsoleto en `packages/connector-github/src/execute.ts` que seguía
+      describiendo DEC-010 como placeholder sin canal real, ya resuelto por DEC-070. Ninguna de
+      estas correcciones cambia comportamiento — son documentación y un comentario.
+- [x] Implementación: `tests/integration/` completo (workspace pnpm propio, `vitest.config.ts` con
+      `fileParallelism: false` — necesario porque cada test arranca su propio Secrets Broker en el
+      canal fijo real de producción, DEC-047/070, y dos procesos de test no pueden competir por el
+      mismo named pipe/socket); `helpers/spawn-process.ts`, `helpers/mock-ssh-server.ts` (servidor
+      SSH real vía `ssh2.Server`, loopback), `helpers/mock-github-server.ts` (servidor HTTP real
+      vía `node:http`, loopback); 3 entrypoints de proceso solo-para-test (`.mjs`, nunca
+      `main`/CLI de producción); 2 ficheros de test, 4 casos: flujo completo real y fail-closed sin
+      Secrets Broker, para `execution-ssh` y `connector-github`. `vitest.config.ts` raíz nuevo
+      (opciones de cobertura, ya que `defineWorkspace()` no las admite). `.gitignore` actualizado
+      (`coverage/`). `pnpm-workspace.yaml` extendido con `tests/*`.
+- [x] Durante la implementación, un fallo real de aislamiento entre tests detectado y corregido:
+      ejecutar ambos ficheros de integración en paralelo hacía que sus respectivos procesos
+      Secrets Broker compitieran por el mismo canal fijo (`executionSecretsChannelPath()`,
+      DEC-047/070) — corregido con `fileParallelism: false`, verificado estable en 8+ ejecuciones
+      consecutivas tras el fix (0 fallos), frente a fallos intermitentes reales antes de aplicarlo.
+- [x] Alcance respetado: no se implementó ningún `main`/CLI de producción real, ni CI/CD; ningún
+      test toca sistemas remotos reales (servidor SSH y servidor HTTP son procesos reales pero
+      exclusivamente loopback); ninguna DEC de Fases 1-13 reabierta; Policy Engine, Registry,
+      Discovery, Dashboard sin tocar.
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 9 paquetes/proyectos (incluido
+      `tests/integration`, que ganó su propio script `typecheck`); `pnpm run lint` sin errores
+      (tras añadir globals de Node.js para los 3 entrypoints `.mjs`, código de proceso real fuera
+      del grafo TypeScript, mismo criterio que la exclusión de `packages/dashboard/src/public`);
+      `pnpm run format` correcto (tras `--write` sobre 4 ficheros); `pnpm run test` — 250/252
+      correctos (2 omitidos en Windows, heredados de Fase 6), sin cambios respecto a Fase 13
+      (`tests/integration` correctamente aislado, no se cuela en el run rápido); `pnpm run
+      test:integration` — 4/4 correctos, estable en 8+ ejecuciones consecutivas; `pnpm run
+      test:coverage` genera reporte sin fallar ningún script; `pnpm run build` correcto en los 8
+      paquetes; `pnpm install --frozen-lockfile` correcto (única dependencia de desarrollo nueva:
+      `@vitest/coverage-v8`, más `ssh2`/`@types/ssh2`/`@modelcontextprotocol/sdk` como
+      devDependencies del nuevo workspace `tests/integration`, ya presentes como dependencias de
+      producción en otros paquetes); grep de secretos/`console.*` en TS/hosts reales del proyecto
+      sin coincidencias en `tests/integration`; `git status` revisado en su totalidad (13 ficheros
+      modificados, directorio `tests/` completo y `vitest.config.ts` sin trackear). **Pendiente:**
+      autorización explícita y separada de `git commit` y de `git push` — todavía no concedidas.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -1145,6 +1201,9 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-069** — Dashboard: convención de ruta real para configuración de Registry/Discovery/Policy.
 - **DEC-070** — Canal real Execution Backend↔Secrets Broker, contrato de dominio exclusivo `get`.
 - **DEC-071** — DEC-036 no se reabre tras el canal real Execution↔Secrets Broker.
+- **DEC-072** — Tests de integración en directorio separado `tests/integration/`.
+- **DEC-073** — Cobertura de código informativa, sin umbral bloqueante.
+- **DEC-074** — CI/CD fuera de alcance de la Fase 14, pospuesto a la Fase 15.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -1236,34 +1295,36 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `63cf9e21602459ebf004f7fd1d0f89eced45248f` (corto: `63cf9e2`) — Fase 12, último commit real
+- Hash: `286be02158cb879a9b4adc9c840d669d7276382f` (corto: `286be02`) — Fase 13, último commit real
   en `origin/master` al momento de escribir esto.
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `feat+docs: implementa Dashboard Web — Fase 12 (DEC-064 a DEC-069)`
-- Commits anteriores: `b301606` (Fase 11), `8d6670e` (correcciones Fase 10 tras revisión de código
-  real), `30ee62a` (Fase 10 — primera implementación), `5c4833d` (Fase 9), `6bdec65` (Fase 8),
-  `86571b7` (Fase 7), `b48670d` (Fase 6), `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053`
-  (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 +
-  Fase 0.5).
-- **Los cambios de la Fase 13 (Hardening de seguridad, DEC-070 a DEC-071) están en el working
-  tree, sin commitear todavía** — pendientes de autorización explícita y separada de
-  `git commit`/`git push`.
+- Mensaje: `feat+docs: implementa Hardening de seguridad — Fase 13 (DEC-070, DEC-071)`
+- Commits anteriores: `63cf9e2` (Fase 12), `b301606` (Fase 11), `8d6670e` (correcciones Fase 10
+  tras revisión de código real), `30ee62a` (Fase 10 — primera implementación), `5c4833d` (Fase 9),
+  `6bdec65` (Fase 8), `86571b7` (Fase 7), `b48670d` (Fase 6), `2411dc3` (Fase 5), `624581e`
+  (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7),
+  `c671bef` (Fase 0 + Fase 0.5).
+- **Los cambios de la Fase 14 (Testing e integración, DEC-072 a DEC-074, más las correcciones de
+  documentación de gobernanza) están en el working tree, sin commitear todavía** — pendientes de
+  autorización explícita y separada de `git commit`/`git push`.
 
 ## Estado del push
 
-- `master` sincronizado con `origin/master` en `63cf9e2` (Fase 12) al inicio de esta fase. Los
-  cambios de la Fase 13 son locales, todavía sin commitear ni pushear.
+- `master` sincronizado con `origin/master` en `286be02` (Fase 13) al inicio de esta fase. Los
+  cambios de la Fase 14 son locales, todavía sin commitear ni pushear.
 
 ## Próxima acción recomendada
 
-1. **Fase 13 (Hardening de seguridad) completada localmente** — INSPECT + PLAN + EXECUTE + VERIFY
-   completados (2026-09-17): 2 decisiones aprobadas (DEC-070, DEC-071), canal real Execution↔
-   Secrets Broker implementado, 2 defectos reales de seguridad encontrados y corregidos tras
-   revisión sistemática, `SECURITY.md` reescrito. Pendiente de presentar el resultado de VERIFY al
-   usuario y de autorización explícita y separada de `git commit` y `git push` — todavía no
-   solicitadas ni concedidas.
-2. Siguiente fase pendiente del ROADMAP tras cerrar la Fase 13: **Fase 14 — Testing e
-   integración**.
+1. **Fase 14 (Testing e integración) completada localmente** — INSPECT + PLAN + EXECUTE + VERIFY
+   completados (2026-09-17): 3 decisiones aprobadas (DEC-072 a DEC-074), tests de integración real
+   entre procesos implementados y verificados (typecheck/lint/format/test/test:integration/
+   test:coverage/build limpios). Incluye además la corrección de documentación de gobernanza
+   desactualizada (README/CHANGELOG/CONTRIBUTING/DEVELOPMENT), señalada explícitamente por el
+   usuario a mitad de la fase. Pendiente de presentar el resultado de VERIFY al usuario y de
+   autorización explícita y separada de `git commit` y `git push` — todavía no solicitadas ni
+   concedidas.
+2. Siguiente fase pendiente del ROADMAP tras cerrar la Fase 14: **Fase 15 — Documentación y
+   release**, que incluye ahora explícitamente CI/CD (pospuesto desde la Fase 14, DEC-074).
 3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
    `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`; el transporte IPC real Core↔Secrets
@@ -1273,7 +1334,11 @@ ni eliminado en esta fase.
    puede implementar sin tocar esos sistemas, prohibido hasta autorización explícita; ningún
    paquete tiene todavía un `main`/CLI de producción real (hallazgo de la Fase 12, ver DEC-065/069)
    — candidato a una fase futura dedicada; rama Linux/macOS del transporte IPC (DEC-010) sin
-   implementar.
+   implementar; CI/CD (DEC-074) queda para la Fase 15.
+4. **Recordatorio de proceso, a raíz de lo señalado por el usuario en esta fase:** revisar
+   periódicamente que `README.md`/`README.en.md`/`CHANGELOG.md`/`CONTRIBUTING.md` no se queden
+   desactualizados — a diferencia de `STATE.md`/`ROADMAP.md`/`DECISIONS.md`, no forman parte del
+   ciclo de actualización automática de cada fase salvo que se revisen explícitamente.
 
 ## Cómo reprender este trabajo
 

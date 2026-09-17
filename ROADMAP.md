@@ -24,7 +24,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 11 | Connectors | **Completada** — 6 decisiones aprobadas (DEC-058 a DEC-063) |
 | 12 | Dashboard Web | **Completada** — 6 decisiones aprobadas (DEC-064 a DEC-069) |
 | 13 | Hardening de seguridad | **Completada** — 2 decisiones aprobadas (DEC-070, DEC-071) |
-| 14 | Testing e integración | Propuesta, no iniciada |
+| 14 | Testing e integración | **Completada** — 3 decisiones aprobadas (DEC-072 a DEC-074) |
 | 15 | Documentación y release | Propuesta, no iniciada |
 | 16 | Stable Release | Propuesta, no iniciada |
 
@@ -163,7 +163,16 @@ de ellas.
   el cliente del nuevo canal de secretos podía cruzar el secreto de una petición con el de otra
   bajo peticiones concurrentes — corregida con una cola FIFO. Ambos verificados con tests que
   reproducen el fallo original antes de la corrección.
-- **Fase 14 — Testing e integración**: pruebas automatizadas y de integración end-to-end.
+- **Fase 14 — Testing e integración**: pruebas automatizadas y de integración end-to-end. 3
+  decisiones aprobadas (DEC-072 a DEC-074, ver `decisions/DECISIONS.md`): tests de integración en
+  un directorio separado `tests/integration/` (workspace pnpm propio, script `test:integration`
+  distinto de `test`), que arrancan procesos reales del sistema operativo (Secrets Broker,
+  execution-ssh, connector-github) comunicados por sus canales IPC reales (DEC-047, DEC-070),
+  contra un servidor SSH y un servidor HTTP simulados localmente (nunca sistemas remotos reales);
+  cobertura de código (`@vitest/coverage-v8`) informativa, sin umbral bloqueante; CI/CD pospuesto
+  explícitamente a la Fase 15. 2 tests de integración nuevos (4 casos: flujo completo real +
+  fail-closed sin Secrets Broker disponible, para cada uno de los dos Execution Backends
+  existentes).
 - **Fase 15 — Documentación y release**: preparación de release pública/interna.
 - **Fase 16 — Stable Release**: primera versión estable.
 

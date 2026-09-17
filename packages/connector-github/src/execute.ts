@@ -20,9 +20,10 @@ export interface ExecuteDependencies {
   readonly confirmationTimeoutMs: number;
   readonly httpTimeoutMs: number;
   /** Fetches the PAT secret (DEC-031, kind "token") from the Secrets Broker for the given
-   * `SecretId`. Injected, exactly like `execution-ssh`'s `getSshKeySecret` — no real Secrets
-   * Broker transport exists yet for any Execution Backend (DEC-010 still a placeholder); this
-   * connector inherits that same known limitation rather than inventing a new one. */
+   * `SecretId`. Injected, exactly like `execution-ssh`'s `getSshKeySecret` — kept as an
+   * injectable dependency so this module never depends on a concrete transport; the real
+   * Secrets Broker channel (DEC-070, Fase 13) is now the default `startConnectorServer` wires in
+   * when the caller does not inject one explicitly (see `ipc/connector-server.ts`). */
   readonly getTokenSecret: (secretId: string) => Promise<SecretRecord | undefined>;
   /** Optional (DEC-052/054/057): best-effort audit writer for the confirmation events this
    * function is responsible for (confirmation-requested, confirmation-resolved). */

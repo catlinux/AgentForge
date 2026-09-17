@@ -1,0 +1,21 @@
+{
+  "name": "@agentforge/integration-tests",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "@agentforge/shared": "workspace:*",
+    "@agentforge/secrets-broker": "workspace:*",
+    "@agentforge/execution-ssh": "workspace:*",
+    "@agentforge/connector-github": "workspace:*",
+    "@agentforge/mcp-server": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "ssh2": "^1.16.0",
+    "@types/ssh2": "^1.15.1",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

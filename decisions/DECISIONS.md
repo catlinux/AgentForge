@@ -1564,6 +1564,64 @@ Format per a cada decisió futura:
 
 ---
 
+## DEC-072 — Estructura de tests de integración: directorio separado (Fase 14)
+
+- Fecha: 2026-09-17
+- Contexto: los 43 tests existentes (Fases 3-13) son unitarios/aislados por paquete, ejecutados
+  todos sin distinción vía `vitest run`. Ningún test arranca varios procesos reales del SO
+  comunicados por los canales IPC reales ya implementados (DEC-047, DEC-070) — el único precedente
+  de integración es `packages/mcp-server/src/server.test.ts`, que conecta cliente/servidor MCP en
+  memoria (`InMemoryTransport`), sin procesos reales.
+- Opciones consideradas: (A) nuevo directorio `tests/integration/` en la raíz del monorepo, fuera
+  de cualquier `packages/*`, con su propio script `test:integration`, arrancando procesos reales
+  vía `child_process` contra los `dist/` ya compilados; (B) tests de integración dentro de cada
+  paquete afectado (p. ej. `packages/mcp-server/src/integration/`), corriendo junto a los
+  unitarios de siempre.
+- Decisión: **(A)**. Evita que `pnpm run test` (rápido, sin procesos reales, usado en cada fase
+  hasta ahora) se vuelva lento y frágil por defecto al mezclarlo con tests que arrancan procesos
+  del SO — un tipo de test cualitativamente distinto merece su propio comando explícito.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, aprobación agrupada del PLAN completo
+  de Fase 14).
+- Consecuencias: nuevo `tests/integration/` con `vitest.config.ts` propio y script
+  `pnpm run test:integration` en el `package.json` raíz, distinto de `pnpm run test`. Requiere
+  `pnpm run build` como precondición documentada (los tests arrancan contra `dist/`, no `src/`).
+
+## DEC-073 — Cobertura de código informativa, sin umbral bloqueante (Fase 14)
+
+- Fecha: 2026-09-17
+- Contexto: ningún paquete ni el monorepo tenían cobertura de código configurada en ningún punto
+  de las Fases 1-13.
+- Opciones consideradas: (A) añadir `@vitest/coverage-v8` con reporte visible pero sin umbral que
+  falle el build; (B) añadir cobertura con un umbral mínimo exigido desde ya; (C) posponer la
+  cobertura a una fase futura.
+- Decisión: **(A)**. Aporta visibilidad objetiva de qué código queda sin probar, sin convertir esta
+  fase en una carrera hacia un número arbitrario de cobertura antes de tener claro qué partes del
+  código merecen más profundidad — un umbral exigido puede añadirse más adelante como decisión
+  explícita separada, con datos reales delante en vez de una cifra elegida a priori.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, aprobación agrupada del PLAN completo
+  de Fase 14).
+- Consecuencias: `@vitest/coverage-v8` añadido como dependencia de desarrollo del monorepo; reporte
+  de cobertura generado y revisado durante VERIFY, sin bloquear ningún script existente.
+
+## DEC-074 — CI/CD fuera de alcance de esta fase (Fase 14)
+
+- Fecha: 2026-09-17
+- Contexto: ningún documento previo situaba la configuración de CI/CD (GitHub Actions u otro) en
+  ninguna fase concreta del ROADMAP; era una decisión genuinamente nueva, con la particularidad de
+  ser la única de esta fase con efecto visible fuera del repositorio local (en GitHub).
+- Opciones consideradas: (A) configurar un workflow mínimo de GitHub Actions
+  (`typecheck`/`lint`/`format`/`test`/`build` en cada push) dentro de esta fase; (B) dejarlo fuera
+  de esta fase, asociado más naturalmente a la Fase 15 (Documentación y release).
+- Decisión: **(B)**. CI/CD encaja mejor conceptualmente junto a la preparación de release (Fase 15)
+  que junto a la introducción de tests de integración (Fase 14) — y mantiene el alcance mínimo de
+  esta fase centrado en pruebas, no en infraestructura de GitHub.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, aprobación agrupada del PLAN completo
+  de Fase 14).
+- Consecuencias: ningún fichero `.github/workflows/` se crea en esta fase; queda como candidato
+  explícito para la Fase 15.
+
+---
+
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
 
 Estas no son decisiones — son la lista de puntos que necesitan decisión antes o durante la Fase 1.

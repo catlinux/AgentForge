@@ -1,8 +1,10 @@
 # Desarrollo — AgentForge
 
-Este documento describe el estado del entorno y proceso de desarrollo. AgentForge todavía no tiene
-código funcional, así que buena parte de este documento describe lo que **está definido** frente
-a lo que **todavía no**, en lugar de instrucciones de ejecución de una aplicación que no existe.
+Este documento describe el estado del entorno y proceso de desarrollo. AgentForge tiene código
+funcional real desde la Fase 2 en adelante (8 paquetes TypeScript/Node.js bajo `packages/`, con
+tests automatizados) — este documento describe tanto lo ya implementado y verificable como lo que
+sigue siendo únicamente una decisión de diseño sin bootstrap de producción todavía (ver
+"Limitación heredada" en cada bloque de fase abajo).
 
 ## Entorno de desarrollo actual
 
@@ -11,9 +13,10 @@ a lo que **todavía no**, en lugar de instrucciones de ejecución de una aplicac
 - **Agente:** Claude Code (CLI/extensión).
 - **Shells disponibles:** PowerShell y Git Bash.
 
-Este es el entorno de desarrollo inicial. El proyecto se plantea local-first; en fases futuras
-podrá comunicarse con un servidor Debian doméstico y un VPS Contabo, pero **ningún sistema remoto
-ha sido tocado, configurado ni conectado hasta la fecha**.
+El proyecto se plantea local-first; en fases futuras podrá comunicarse con un servidor Debian
+doméstico y un VPS Contabo, pero **ningún sistema remoto ha sido tocado, configurado ni conectado
+hasta la fecha** — toda la implementación de ejecución remota (Fase 7) se ha verificado
+exclusivamente contra servidores SSH simulados localmente, nunca contra esos sistemas reales.
 
 ## Stack tecnológico
 
@@ -252,13 +255,23 @@ y revisión/DEC-036 — ver `decisions/DECISIONS.md`.
 
 ## Cómo ejecutar el proyecto
 
-No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando
-exista una primera implementación real, con instrucciones verificadas (no supuestas).
+No existe todavía ningún `main`/CLI de producción real que arranque los procesos (`mcp-server`,
+`execution-ssh`, `connector-github`, `secrets-broker`, `dashboard`) como un despliegue completo —
+hallazgo explícito de la Fase 12, documentado como limitación heredada, candidato a una fase
+futura dedicada (ver `decisions/DECISIONS.md`, DEC-065/069). Cada paquete se ejecuta y verifica
+hoy mediante:
+
+- `pnpm run test` — tests unitarios/aislados de los 8 paquetes.
+- `pnpm run test:integration` — tests de integración real entre procesos (`tests/integration/`,
+  Fase 14), que sí arrancan procesos reales del sistema operativo, pero mediante scripts de test
+  propios, no un bootstrap de producción.
+- `packages/dashboard`: `startDashboard(port)` (`packages/dashboard/src/server.ts`) arranca un
+  servidor real en `127.0.0.1:<port>` — es la única pieza con un punto de entrada pensado para
+  ejecutarse fuera de test, aunque todavía sin script de arranque en `package.json`.
 
 ## Cómo instalar dependencias
 
-No aplica todavía. Este apartado se completará junto con la elección de stack tecnológico en la
-Fase 1.
+`pnpm install` en la raíz del monorepo (gestor de paquetes decidido en DEC-009, vía Corepack).
 
 ## Estructura del repositorio
 
@@ -266,18 +279,20 @@ Ver `README.md`, sección "Cómo está organizado el proyecto", para la estructu
 
 ## Control de versiones
 
-- El repositorio **todavía no está inicializado** con Git.
-- La identidad Git global de esta máquina (`warcrafted-server <warcrafted.server@gmail.com>`) no
-  corresponde aparentemente a este proyecto. **No se ha modificado la configuración global de
-  Git.** Si se necesita una identidad específica para AgentForge, se configurará a nivel **local**
-  del repositorio (`git config user.name`/`user.email` sin `--global`), previa autorización.
-- No se ha decidido si el proyecto usará GitHub, y con qué cuenta/repositorio/visibilidad — ver
-  `decisions/DECISIONS.md`.
+- Repositorio Git **inicializado** (Fase 2, 2026-09-16), rama `master`.
+- Identidad **local** del repositorio (no global, DEC-002): `catlinux <marc.catlinux@gmail.com>`
+  — la identidad Git global de esta máquina (`warcrafted-server <warcrafted.server@gmail.com>`)
+  nunca se ha modificado.
+- Remoto: `https://github.com/catlinux/AgentForge` (DEC-001), accedido vía SSH. Visibilidad
+  (público/privado) todavía no confirmada explícitamente por el usuario — no asumida.
+- Cada commit y cada push requieren autorización explícita y separada del usuario (ver
+  `.claude/CLAUDE.md`) — nunca se ejecutan automáticamente al cerrar una fase.
 
 ## Licencia
 
 **PENDIENTE DE DECISIÓN.** No se ha elegido todavía una licencia para el código de AgentForge. No
-debe asumirse ninguna licencia por defecto.
+debe asumirse ninguna licencia por defecto, pese a que el código ya es real y sustancial (8
+paquetes, 13 fases).
 
 Distinción importante (ver `docs/research/COMPOSIO-ANALYSIS.md` y `docs/research/MCP-ANALYSIS.md`
 para el detalle completo de licencias de terceros investigadas):
@@ -287,21 +302,35 @@ para el detalle completo de licencias de terceros investigadas):
   - Composio (SDK cliente): MIT, titular "Sampark Inc." — con una inconsistencia menor entre
     `LICENSE` (MIT) y `CONTRIBUTING.md` (ISC), marcada como `LEGAL REVIEW REQUIRED` de riesgo bajo
     en la investigación. El backend/ejecución/credenciales de Composio son propietarios y no están
-    disponibles para reutilizar.
+    disponibles para reutilizar. Ningún código de Composio se ha reutilizado en AgentForge.
   - SDKs oficiales de MCP (TypeScript, Python): MIT / Apache 2.0 según paquete y versión.
   - Servidores de referencia MCP (`modelcontextprotocol/servers`): dual-licenciados Apache 2.0
     (código nuevo) / MIT (código existente).
-- **Licencias de dependencias futuras:** no aplicable todavía — no hay dependencias porque no hay
-  código.
+- **Licencias de dependencias reales de producción:** `@modelcontextprotocol/sdk` (MIT/Apache 2.0
+  según paquete), `ssh2` (MIT), `fastify` (MIT) — ninguna con licencia copyleft fuerte que
+  condicione la licencia final de AgentForge; revisar de nuevo cuando se decida la licencia propia.
 - **Puntos que requieren revisión legal:** la inconsistencia MIT/ISC de Composio (riesgo bajo,
-  documentada, no bloqueante). Ningún otro punto de riesgo legal detectado en la Fase 0.
+  documentada, no bloqueante). Ningún otro punto de riesgo legal detectado.
 
 ## Testing
 
-No aplica todavía. Se documentará junto con la primera implementación funcional.
+- Framework: [Vitest](https://vitest.dev/) en todos los paquetes.
+- `pnpm run test` — tests unitarios/aislados, rápidos, sin procesos reales del SO (43+ ficheros de
+  test, 250+ tests, ver `STATE.md` para el conteo exacto por fase).
+- `pnpm run test:integration` — tests de integración real entre procesos (Fase 14,
+  `tests/integration/`), más lentos, requieren `pnpm run build` primero.
+- `pnpm run test:coverage` — reporte de cobertura de código (`@vitest/coverage-v8`), informativo,
+  sin umbral bloqueante (DEC-073).
+- 2 tests de permisos POSIX (`packages/secrets-broker/src/storage/master-key.test.ts`) se omiten
+  explícitamente en Windows — `chmod`/`stat().mode` no tienen la misma semántica en NTFS; sin
+  verificación automatizada real en la plataforma de desarrollo actual, solo verificable en Linux.
 
 ## Variables de entorno / configuración
 
-No aplica todavía. Cuando exista implementación, cualquier variable de entorno o archivo de
-configuración se documentará aquí — nunca con valores reales de secretos (ver `SECURITY.md` y
-`.gitignore`).
+- `AGENTFORGE_DATA_DIR` — directorio base donde viven los ficheros de estado real de AgentForge
+  (Audit Log JSON Lines por proceso, caché de Tool Registry, configuración de Discovery/Policy).
+  Por defecto `~/.agentforge` si no se define (ver `packages/shared/src/paths/resolve-path.ts`,
+  DEC-065/069). Nunca contiene secretos — esos viven cifrados en el propio Secrets Broker
+  (`packages/secrets-broker`), en un fichero separado gestionado por DEC-030/032.
+- Ninguna otra variable de entorno definida todavía. Nunca se documentan aquí valores reales de
+  secretos (ver `SECURITY.md` y `.gitignore`).
