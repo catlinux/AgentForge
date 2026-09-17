@@ -2,6 +2,7 @@ import type {
   ExecutionChannelClient,
   ExecutionChannelRequest,
   PolicyDecision,
+  SessionId,
   ToolEntry,
 } from "@agentforge/shared";
 
@@ -33,11 +34,15 @@ export interface ToolsCallDeps {
  * Execution (so the operation-hash registry there can discard a late approval, DEC-045
  * guarantee 4) and returns immediately — it does NOT wait for Execution's original request to
  * resolve, and it never later reports a result for a call the client already gave up on.
+ *
+ * `sessionId` (DEC-049) is carried through purely as correlation metadata — it never affects
+ * policy evaluation, confirmation, or execution logic.
  */
 export async function handleToolCall(
   mcpToolName: string,
   args: Readonly<Record<string, string>>,
   hostId: string,
+  sessionId: SessionId,
   deps: ToolsCallDeps,
 ): Promise<McpToolResult> {
   const entry = await deps.resolveToolEntry(mcpToolName);
@@ -62,6 +67,7 @@ export async function handleToolCall(
       hostId,
       parameters: args,
       decision,
+      sessionId,
     };
 
     const requestPromise = deps.executionClient.request(channelRequest);

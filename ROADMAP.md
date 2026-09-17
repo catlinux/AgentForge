@@ -19,7 +19,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 6 | Secrets Broker | **En curso** — 7 decisiones aprobadas (DEC-030 a DEC-036) |
 | 7 | Ejecución remota / SSH | **En curso** — 6 decisiones aprobadas (DEC-037 a DEC-042) |
 | 8 | Integración MCP | **En curso** — 5 decisiones aprobadas (DEC-043 a DEC-047) |
-| 9 | Sessions | Propuesta, no iniciada |
+| 9 | Sessions | **En curso** — 4 decisiones aprobadas (DEC-048 a DEC-051) |
 | 10 | Audit Log | Propuesta, no iniciada |
 | 11 | Connectors | Propuesta, no iniciada |
 | 12 | Dashboard Web | Propuesta, no iniciada |
@@ -113,7 +113,13 @@ de ellas.
   comunicados por un canal del mismo patrón de DEC-010 (DEC-047) — precisamente porque stdio ocupa
   stdin/stdout del servidor MCP, en conflicto directo con `ReadlineConfirmationChannel`. Hooks de
   Claude Code quedan documentados como extensión futura posible, no implementados en esta fase.
-- **Fase 9 — Sessions**: gestión de sesiones de agente (identidad + herramientas + estado).
+- **Fase 9 — Sessions**: gestión de sesiones de agente (identidad + herramientas + estado). 4
+  decisiones aprobadas (DEC-048 a DEC-051, ver `decisions/DECISIONS.md`): alcance
+  single-user/single-agent (sin reabrir DEC-047); `SessionId` como identificador ligero de
+  correlación, sin fusionar los registros ya existentes de Policy Engine/Execution bajo una
+  entidad; generado por el propio servidor MCP (no derivado del SDK — `StdioServerTransport` no
+  expone `sessionId` de transporte, verificado técnicamente); tipo en `packages/shared`, sin
+  paquete ni proceso propio.
 - **Fase 10 — Audit Log**: registro centralizado y consultable de todas las acciones.
 - **Fase 11 — Connectors**: integraciones concretas con servicios externos (GitHub, Dropbox, etc.),
   solo tras autorización explícita.

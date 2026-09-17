@@ -451,7 +451,17 @@ la fase 1.~~ — **Fase 8 (DEC-043 a DEC-047) resuelve el resto de preguntas de 
 
 ## 11. Sesiones y estado
 
-**PROPOSAL:**
+**DECISIÓN (DEC-048 a DEC-051, Fase 9):** alcance, modelo, origen y ubicación de Sessions ya están
+decididos — ver `decisions/DECISIONS.md`. Resumen: alcance **single-user/single-agent** en esta
+fase, sin reabrir DEC-047; `SessionId` como **identificador ligero de correlación**, nunca una
+entidad `Session` que posea o fusione los registros ya existentes de Policy Engine
+(`InMemoryPolicyApprovalStore`) o Execution (`OperationHashRegistry`) — esos registros permanecen
+exactamente como están; generado por el propio servidor MCP al arrancar (no derivado del SDK MCP:
+verificación técnica confirmó que `StdioServerTransport`, DEC-046, nunca expone `sessionId` de
+transporte — esa capacidad es exclusiva de transportes HTTP/Streamable con reconexión); tipo en
+`packages/shared`, sin paquete ni proceso propio.
+
+**PROPOSAL (contexto histórico, Fase 1 — ver DEC-048 a DEC-051 arriba para lo ya decidido):**
 
 - Ningún proyecto estudiado en la Fase 0.7 documentó con claridad primaria un modelo de "sesión de
   agente" tan desarrollado como el de Composio (identidad de usuario + acceso a herramientas +
@@ -466,10 +476,9 @@ la fase 1.~~ — **Fase 8 (DEC-043 a DEC-047) resuelve el resto de preguntas de 
   (gestionado por el Audit Log, §12). Un concepto de sesión más rico (multi-usuario, múltiples
   agentes concurrentes) se deja como trabajo futuro explícito.
 
-**OPEN QUESTION:** si AgentForge necesitará soportar múltiples agentes/usuarios concurrentes en
-algún momento (relevante para decidir si conviene diseñar el modelo de sesión más rico ya desde
-ahora, aunque no se implemente). **PROPOSAL preliminar:** no diseñar para multi-usuario en la fase
-1 — el roadmap (`ROADMAP.md`) ya contempla una Fase 9 — Sessions dedicada si resulta necesaria.
+~~**OPEN QUESTION:** si AgentForge necesitará soportar múltiples agentes/usuarios concurrentes en
+algún momento~~ — **resuelto en Fase 9, ver DEC-048**: no en esta fase; multi-agent/multi-user
+quedan como evolución futura explícita.
 
 ---
 

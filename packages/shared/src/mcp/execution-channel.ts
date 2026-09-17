@@ -1,6 +1,7 @@
 import type { PolicyDecision } from "../policy/decision.js";
 import type { SchemaFingerprint, ToolIdentity } from "../registry/identity.js";
 import type { ExecutionOutcome } from "../execution/result.js";
+import type { SessionId } from "../session/session-id.js";
 
 /**
  * Domain contract for the MCP-server <-> Execution IPC channel (DEC-047). Deliberately NOT
@@ -13,6 +14,13 @@ export interface ExecutionChannelRequest {
   readonly hostId: string;
   readonly parameters: Readonly<Record<string, string>>;
   readonly decision: PolicyDecision;
+  /**
+   * Correlation metadata only (DEC-049) — Execution never uses this for authorization or
+   * confirmation logic (Policy Engine's approval store and the operation-hash registry remain
+   * untouched by Sessions). Carried through purely so a future Audit Log (Fase 10) can group
+   * related events.
+   */
+  readonly sessionId: SessionId;
 }
 
 export type ExecutionChannelResponse =

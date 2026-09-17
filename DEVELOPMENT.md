@@ -154,6 +154,16 @@ confirmación durante `tools/call`, transporte, y separación de procesos MCP↔
   cualquier fallo/ambigüedad del canal; una única instancia de cada en esta fase, sin discovery
   multi-instancia (DEC-047).
 
+**DECIDIDO (DEC-048 a DEC-051, Fase 9, 2026-09-17):** alcance, modelo, origen y ubicación de
+Sessions — ver `decisions/DECISIONS.md`.
+
+- **Alcance:** single-user/single-agent, sin reabrir DEC-047 (DEC-048).
+- **Modelo:** `SessionId` como identificador ligero de correlación — sin fusionar los registros
+  ya existentes de Policy Engine/Execution bajo una entidad `Session` (DEC-049).
+- **Origen:** generado por el propio servidor MCP al arrancar — `StdioServerTransport` no expone
+  `sessionId` de transporte, verificado con el SDK real (DEC-050).
+- **Ubicación:** tipo en `packages/shared`, sin paquete ni proceso propio (DEC-051).
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando

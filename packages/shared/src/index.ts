@@ -6,3 +6,4 @@ export * from "./policy/index.js";
 export * from "./secrets/index.js";
 export * from "./execution/index.js";
 export * from "./mcp/index.js";
+export * from "./session/index.js";

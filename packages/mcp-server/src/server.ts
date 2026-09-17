@@ -5,8 +5,10 @@ import type {
   DiscoveredToolView,
   ExecutionChannelClient,
   PolicyDecision,
+  SessionId,
   ToolEntry,
 } from "@agentforge/shared";
+import { generateSessionId } from "@agentforge/shared";
 import { toMcpToolDescriptors } from "./tools-list.js";
 import { handleToolCall } from "./tools-call.js";
 
@@ -26,8 +28,15 @@ export interface McpServerDeps {
  *
  * DEC-046: stdio transport only — this module never writes anything to stdout except what the
  * SDK's StdioServerTransport itself writes as MCP protocol frames.
+ *
+ * DEC-048/DEC-050: a single `SessionId` is generated once, at server construction — coherent
+ * with the single-user/single-agent scope of this phase, where a session is equivalent to the
+ * MCP server process's own lifetime. Not derived from the SDK's transport-level `sessionId`,
+ * which `StdioServerTransport` never assigns (verified against the installed SDK).
  */
 export function createMcpServer(deps: McpServerDeps): Server {
+  const sessionId: SessionId = generateSessionId();
+
   const server = new Server(
     { name: "agentforge", version: "0.0.0" },
     { capabilities: { tools: {} } },
@@ -47,7 +56,7 @@ export function createMcpServer(deps: McpServerDeps): Server {
       stringArgs[key] = String(value);
     }
 
-    const result = await handleToolCall(request.params.name, stringArgs, hostId, {
+    const result = await handleToolCall(request.params.name, stringArgs, hostId, sessionId, {
       resolveToolEntry: deps.resolveToolEntry,
       evaluate: deps.evaluate,
       executionClient: deps.executionClient,

@@ -12,27 +12,23 @@ copiar).
 
 ## Fase actual
 
-**Fase 8 — Integración MCP**
+**Fase 9 — Sessions**
 
-**Estado:** COMPLETADA (2026-09-17) — 5 decisiones aprobadas (DEC-043 a DEC-047: servidor MCP
-único agnóstico del backend, paquete propio `packages/mcp-server`, confirmación humana durante
-`tools/call` mediante progreso periódico + gestión explícita de cancelación con guard de estado
-atómico sobre `OperationHash` — ampliando DEC-038 sin modificarla —, transporte stdio, y
-**servidor MCP y Execution como procesos separados** comunicados por un canal del mismo patrón de
-DEC-010 con contrato de dominio propio). Implementación completa con tests de seguridad,
-incluyendo las condiciones de carrera de cancelación/aprobación. Ver `decisions/DECISIONS.md`
-para el registro formal.
+**Estado:** COMPLETADA (2026-09-17) — 4 decisiones aprobadas (DEC-048 a DEC-051: alcance
+single-user/single-agent sin reabrir DEC-047; `SessionId` como identificador ligero de
+correlación, sin fusionar los registros ya existentes de Policy Engine/Execution bajo una
+entidad; generado por el propio servidor MCP al arrancar, no derivado del SDK MCP —verificado
+técnicamente que `StdioServerTransport` nunca expone `sessionId` de transporte—; tipo en
+`packages/shared`, sin paquete ni proceso propio). Implementación completa con tests. Ver
+`decisions/DECISIONS.md` para el registro formal.
 
-**Implementación:** servidor MCP funcional (`@modelcontextprotocol/sdk` oficial, transporte
-stdio) — `tools/list` traducido desde Discovery, `tools/call` con progreso/cancelación
-gestionados explícitamente, cliente IPC (`NetExecutionChannelClient`) hacia el proceso Execution
-separado, servidor IPC en Execution (`startExecutionServer`) que expone `execute()` sin bypassear
-Policy Engine. `OperationHashRegistry` (extensión de DEC-038) con tres estados (pendiente/usado/
-cancelado) para resolver de forma determinista la carrera cancelación/aprobación. **Ningún
-sistema remoto real tocado**, ningún despliegue externo — tests con IPC real en memoria (sockets
-de test) y SSH mockeado. Fases 3 a 7 siguen vigentes y sin cambios estructurales (solo
-`confirm.ts`/`execute.ts` de Fase 7 ampliados para aceptar el registro de 3 estados, sin cambiar
-sus garantías ya aprobadas).
+**Implementación:** `SessionId` generado una vez por instancia del servidor MCP (`generateSessionId`,
+UUID), propagado como metadato de correlación en `ExecutionChannelRequest` (contrato de dominio
+de DEC-047) — nunca usado por Policy Engine ni por los registros de aprobación/confirmación ya
+existentes, que permanecen exactamente como estaban. **Ningún sistema remoto real tocado**, ningún
+despliegue externo. Fases 3 a 8 siguen vigentes y sin cambios estructurales (solo se amplió el
+contrato `ExecutionChannelRequest` con el campo `sessionId` y su propagación en
+`server.ts`/`tools-call.ts` del servidor MCP).
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
@@ -41,14 +37,15 @@ APROBADA (Fase 2: DEC-008 a DEC-012) + TOOL REGISTRY APROBADO E IMPLEMENTADO (Fa
 DEC-017) + TOOL DISCOVERY APROBADO E IMPLEMENTADO (Fase 4: DEC-018 a DEC-022) + POLICY ENGINE
 APROBADO E IMPLEMENTADO (Fase 5: DEC-023 a DEC-029) + SECRETS BROKER APROBADO E IMPLEMENTADO
 (Fase 6: DEC-030 a DEC-036) + EJECUCIÓN REMOTA/SSH APROBADA E IMPLEMENTADA (Fase 7: DEC-037 a
-DEC-042) + INTEGRACIÓN MCP APROBADA E IMPLEMENTADA (Fase 8: DEC-043 a DEC-047). Resto documentado
-como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
+DEC-042) + INTEGRACIÓN MCP APROBADA E IMPLEMENTADA (Fase 8: DEC-043 a DEC-047) + SESSIONS
+APROBADAS E IMPLEMENTADAS (Fase 9: DEC-048 a DEC-051). Resto documentado como PROPOSAL/OPEN
+QUESTION en `architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 8 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
-tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 9 (Sessions)
-— sin implementar nada todavía.
+Fase 9 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
+tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 10 (Audit
+Log) — sin implementar nada todavía.
 
 ## Trabajo completado
 
@@ -605,6 +602,55 @@ decisión automática.
       diff` confirma que Registry, Discovery, Policy Engine, Secrets Broker, y las plantillas de
       comando/cliente SSH de Fase 7 no fueron tocados — solo `confirm.ts`/`execute.ts` ampliados.
 
+### Fase 9 — Sessions (completada, 2026-09-17)
+- [x] Análisis en dos rondas: primero objetivo/alcance/modelo/ciclo de vida/persistencia/procesos/
+      relación con Audit Log, con énfasis explícito en no asumir que Sessions deba fusionar los
+      registros ya existentes de Policy Engine/Execution — concluyó que un identificador ligero de
+      correlación es suficiente, sin entidad `Session` con estado propio; después, verificación
+      técnica explícita del SDK MCP real (`1.30.0`) antes de aprobar DEC-050: confirmado que
+      `RequestHandlerExtra.sessionId` existe pero es un concepto de **transporte** (solo lo asignan
+      transportes HTTP/Streamable con reconexión) y que `StdioServerTransport` (DEC-046) nunca lo
+      asigna; confirmado también que `prompt_id` no existe en el protocolo MCP (pertenece al
+      formato de hooks de Claude Code, verificado en Fase 7, una superficie distinta).
+- [x] **DEC-048** — Alcance: single-user/single-agent en esta fase, sin reabrir DEC-047.
+- [x] **DEC-049** — Modelo: `SessionId` como identificador ligero de correlación — Policy
+      Engine (`InMemoryPolicyApprovalStore`) y Execution (`OperationHashRegistry`) permanecen
+      exactamente como estaban, sin fusión ni coordinación por parte de Sessions.
+- [x] **DEC-050** — Origen: generado por el propio servidor MCP al arrancar (UUID), no derivado
+      del `sessionId` del SDK — inviable con el transporte stdio ya decidido.
+- [x] **DEC-051** — Ubicación: `packages/shared`, sin paquete ni proceso propio.
+- [x] `decisions/DECISIONS.md`, `STATE.md`, `ROADMAP.md`, `DEVELOPMENT.md`,
+      `architecture/ARCHITECTURE.md`/`.en.md` (§11) sincronizados con DEC-048 a DEC-051,
+      resolviendo la pregunta abierta de multi-usuario/multi-agente heredada de Fase 1.
+- [x] Implementación: `packages/shared/src/session/` — `session-id.ts` (`SessionId`, tipo
+      opaco), `generate.ts` (`generateSessionId`, UUID). `ExecutionChannelRequest`
+      (`packages/shared/src/mcp/execution-channel.ts`) ampliado con el campo `sessionId`
+      (correlación pura, documentado explícitamente que Execution nunca lo usa para autorización).
+      `packages/mcp-server/src/server.ts` genera un único `SessionId` en `createMcpServer` (una
+      sesión por ciclo de vida del proceso, coherente con DEC-048) y lo propaga a
+      `handleToolCall`/`tools-call.ts`, que lo incluye en cada `ExecutionChannelRequest` sin
+      usarlo en ninguna decisión.
+- [x] Tests (Vitest): 6 nuevos — 2 de `generateSessionId` (no vacío, nunca repetido entre
+      generaciones); 1 de propagación explícita de `sessionId` en `tools-call.test.ts`; 3 de
+      `server.test.ts` usando `InMemoryTransport.createLinkedPair()` del SDK real (cliente y
+      servidor MCP conectados en memoria, sin procesos ni red) — cubre explícitamente: el mismo
+      `SessionId` se propaga a través de múltiples `tools/call` en una misma instancia de
+      servidor; una instancia nueva del servidor (simulando un reinicio del proceso) genera un
+      `SessionId` distinto, sin reutilización entre reinicios; `sessionId` nunca afecta al
+      veredicto de Policy Engine ni al resultado de ejecución.
+- [x] Alcance respetado: no se introdujo persistencia, multi-agent, multi-user, ni discovery de
+      múltiples instancias; no se reabrió DEC-047 ni ninguna otra decisión de Fases 1-8; ningún
+      registro de Policy Engine o Execution fue modificado (verificado por `git diff` vacío sobre
+      esos ficheros).
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 5 paquetes; `pnpm run lint` sin
+      errores; `pnpm run format` correcto (tras `--write` sobre 2 ficheros de test); `pnpm run
+      test` — 138/140 correctos (2 tests de permisos POSIX omitidos en Windows, heredados de Fase
+      6) (6 nuevos + 132 previos); `pnpm run build` correcto en los 5 paquetes; `pnpm install
+      --frozen-lockfile` correcto (sin dependencias nuevas); grep de secretos/logging sin
+      coincidencias; `dist/`/`node_modules/`/`*.tsbuildinfo` correctamente ignorados; `git diff`
+      confirma que Policy Engine, Execution (salvo el contrato ya ampliado en Fase 8) y Secrets
+      Broker no fueron tocados.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -687,6 +733,11 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-046** — Transporte stdio, ningún contenido no-MCP en stdout del servidor.
 - **DEC-047** — Servidor MCP y Execution como procesos separados, canal IPC del patrón de
   DEC-010 con contrato de dominio propio, fail-closed uniforme.
+- **DEC-048** — Alcance de Sessions: single-user/single-agent, sin reabrir DEC-047.
+- **DEC-049** — Modelo: `SessionId` ligero de correlación, sin fusionar registros de Policy
+  Engine/Execution.
+- **DEC-050** — Origen: generado por el servidor MCP, no derivado del SDK (verificado técnicamente).
+- **DEC-051** — Ubicación: `packages/shared`, sin paquete ni proceso propio.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -778,33 +829,32 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `86571b71c03104a6d72c46aa3106c7bea15ad02d` (corto: `86571b7`)
+- Hash: `6bdec652fd6a569919e2ad4b615a55803a4737f4` (corto: `6bdec65`)
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `feat+docs: implementa Ejecución remota/SSH — Fase 7 (DEC-037 a DEC-042)`
-- Contenido: 31 archivos, 1.411 inserciones/44 eliminaciones — modelo
-  `ExecutionRequest`/`ExecutionOutcome` en `packages/shared/src/execution/`; plantillas de
-  comando, confirmación humana (`ConfirmationChannel`/`ReadlineConfirmationChannel`), cliente SSH
-  con timeout/truncado, orquestador en `packages/execution-ssh/` (paquete nuevo) con 35 tests
-  nuevos (103 en total); incluye la corrección de seguridad de `shell-quote.ts` encontrada en
-  revisión final; `DEVELOPMENT.md`, `ROADMAP.md`, `STATE.md`, `architecture/ARCHITECTURE.md`/
-  `.en.md`, `decisions/DECISIONS.md` (actualizados con DEC-037 a DEC-042).
-- Commits anteriores: `b48670d` (Fase 6), `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053`
-  (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef`
-  (Fase 0 + Fase 0.5).
+- Mensaje: `feat+docs: implementa Integración MCP — Fase 8 (DEC-043 a DEC-047)`
+- Contenido: 33 archivos, 2.401 inserciones/100 eliminaciones — contrato de dominio
+  `ExecutionChannelClient`/`Request`/`Response` en `packages/shared/src/mcp/`;
+  `OperationHashRegistry`/`cancelOperation` y el servidor IPC de Execution en
+  `packages/execution-ssh/src/confirmation/` e `.../ipc/`; servidor MCP completo (paquete nuevo
+  `packages/mcp-server/`, SDK oficial, transporte stdio) con 31 tests nuevos (134 en total);
+  `DEVELOPMENT.md`, `ROADMAP.md`, `STATE.md`, `architecture/ARCHITECTURE.md`/`.en.md`,
+  `decisions/DECISIONS.md` (actualizados con DEC-043 a DEC-047).
+- Commits anteriores: `86571b7` (Fase 7), `b48670d` (Fase 6), `2411dc3` (Fase 5), `624581e`
+  (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7),
+  `c671bef` (Fase 0 + Fase 0.5).
 
 ## Estado del push
 
 - **Realizado** (2026-09-17, con autorización explícita del usuario). `master` sincronizado con
-  `origin/master` (`86571b7`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
+  `origin/master` (`6bdec65`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
   al mismo hash).
 
 ## Próxima acción recomendada
 
-1. Pedir autorización explícita para el commit+push de los cambios de la Fase 8 (DEC-043 a
-   DEC-047, implementación del servidor MCP y del canal IPC MCP↔Execution, documentación
-   sincronizada).
+1. Pedir autorización explícita para el commit+push de los cambios de la Fase 9 (DEC-048 a
+   DEC-051, implementación de `SessionId` y su propagación mínima, documentación sincronizada).
 2. Tras el commit/push, presentar únicamente el resumen de objetivos y decisiones a analizar de la
-   Fase 9 (Sessions) — sin implementar nada de esa fase todavía.
+   Fase 10 (Audit Log) — sin implementar nada de esa fase todavía.
 3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
    `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`; el transporte IPC real Core↔Secrets

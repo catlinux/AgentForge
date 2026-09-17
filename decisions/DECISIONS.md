@@ -1003,6 +1003,76 @@ Format per a cada decisió futura:
   MCP — coherente con "un solo desarrollador operando localmente". E2 queda como alternativa
   futura no descartada si esta carga operacional resulta incómoda en la práctica.
 
+## DEC-048 — Alcance de Sessions (Fase 9)
+
+- Fecha: 2026-09-17
+- Contexto: `architecture/ARCHITECTURE.md` §11 dejó explícitamente para esta fase la pregunta de si
+  diseñar para multi-usuario/multi-agente. DEC-047 (Fase 8) ya fijó una única instancia de
+  servidor MCP/Execution, sin discovery multi-instancia.
+- Opciones consideradas: (A) single-user/single-agent — `SessionId` equivalente al ciclo de vida
+  del proceso servidor MCP; (B) multi-agent — `SessionId` por conversación/invocación; (C)
+  multi-user/concurrencia real — en tensión directa con DEC-047.
+- Decisión: **(A)**. Sessions se diseña para single-user/single-agent en esta fase, coherente con
+  el estado real del proyecto (un solo desarrollador) y sin reabrir DEC-047.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: (B) y (C) quedan como evolución futura explícita, no bloqueante ahora. No se
+  reabre DEC-047.
+
+## DEC-049 — Modelo de sesión: identificador ligero, no entidad (Fase 9)
+
+- Fecha: 2026-09-17
+- Contexto: se evaluó si Sessions debía fusionar los registros ya existentes de Policy Engine
+  (`InMemoryPolicyApprovalStore`, DEC-026/DEC-027) y Execution (`OperationHashRegistry`, DEC-045)
+  bajo un objeto `Session` único que los poseyera/coordinara.
+- Opciones consideradas: (A) `SessionId` opaco como metadato de correlación, sin poseer estado de
+  otros módulos; (B) entidad `Session` formal que coordina/posee estado ajeno.
+- Decisión: **(A)**. Ningún registro existente se fusiona ni se reestructura — Policy Engine y
+  Execution mantienen sus registros exactamente como están, sin cambios de propiedad ni de
+  ciclo de vida.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: preserva el aislamiento entre módulos ya establecido en fases anteriores; no
+  introduce acoplamiento nuevo entre Policy Engine, Execution y Sessions. `packages/shared` gana
+  un tipo `SessionId` (mismo patrón que `ToolIdentity`/`SecretId`), sin estado propio gestionado
+  por Sessions.
+
+## DEC-050 — Origen del `SessionId` (Fase 9)
+
+- Fecha: 2026-09-17
+- Contexto: se planteó si derivar el identificador de sesión del `sessionId` expuesto por el SDK
+  MCP oficial. Verificación técnica explícita contra el SDK TypeScript `1.30.0` instalado
+  (`RequestHandlerExtra.sessionId`, `shared/transport.d.ts`, `server/stdio.js`) confirmó: (1)
+  `sessionId` existe en el SDK pero es un concepto **de transporte** — solo lo asignan
+  transportes HTTP/Streamable con reconexión (`StreamableHTTPServerTransport`,
+  `sessionIdGenerator`); (2) `StdioServerTransport` (el transporte ya decidido en DEC-046) **nunca
+  lo asigna** — sin una sola referencia a `sessionId` en su código fuente; (3) no existe ningún
+  `prompt_id` en el protocolo MCP — ese campo pertenece al formato de entrada de los hooks de
+  Claude Code (verificado en Fase 7), una superficie distinta; el único campo relacionado en
+  `tools/call` es `progressToken` (correlaciona notificaciones de progreso de una petición
+  concreta, no una conversación) y `taskId`/`related-task` (mecanismo de tareas largas, sin
+  semántica de conversación).
+- Opciones consideradas: (A) generado por el propio servidor MCP de AgentForge; (B) derivado de
+  `sessionId`/`prompt_id` del SDK MCP — descartada tras verificación técnica: no hay ningún campo
+  utilizable con el transporte stdio ya decidido en DEC-046.
+- Decisión: **(A)**. El servidor MCP genera su propio `SessionId` (UUID, mismo patrón ya usado
+  para `ToolIdentity`/`SecretId`) al arrancar.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, tras verificación técnica explícita
+  del SDK MCP real instalado).
+- Consecuencias: ninguna dependencia de una capacidad del SDK que el transporte stdio no provee.
+  Si en el futuro se ampliara a alcance (B)/(C) de DEC-048, el punto de generación podría moverse
+  a "por invocación" sin cambiar el tipo ni el patrón ya establecido.
+
+## DEC-051 — Ubicación del tipo `SessionId` (Fase 9)
+
+- Fecha: 2026-09-17
+- Contexto: mismo criterio ya aplicado en DEC-017/DEC-022/DEC-029/DEC-044 — evaluar si `SessionId`
+  justifica un paquete o proceso propio.
+- Opciones consideradas: (A) `packages/shared`, sin paquete ni proceso nuevo; (B) paquete propio.
+- Decisión: **(A)**. No existe ninguna frontera de aislamiento/seguridad real que justifique un
+  componente nuevo — mismo razonamiento ya aplicado sistemáticamente en el proyecto.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: ninguna nueva; refuerza el patrón ya establecido de no crear estructura sin razón
+  concreta.
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -1060,6 +1130,10 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 - ~~Confirmación humana durante tools/call (Fase 8)~~ → DEC-045.
 - ~~Transporte del servidor MCP (Fase 8)~~ → DEC-046.
 - ~~Separación de procesos: servidor MCP y Execution (Fase 8)~~ → DEC-047.
+- ~~Alcance de Sessions (Fase 9)~~ → DEC-048.
+- ~~Modelo de sesión: identificador ligero, no entidad (Fase 9)~~ → DEC-049.
+- ~~Origen del SessionId (Fase 9)~~ → DEC-050.
+- ~~Ubicación del tipo SessionId (Fase 9)~~ → DEC-051.
 
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):

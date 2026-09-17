@@ -7,12 +7,14 @@ import type {
   ExecutionChannelRequest,
   PolicyDecision,
   SchemaFingerprint,
+  SessionId,
   ToolIdentity,
 } from "@agentforge/shared";
 import { NetExecutionChannelClient } from "./execution-client.js";
 
 const identity = "tool-1" as ToolIdentity;
 const fingerprint = "fp-1" as SchemaFingerprint;
+const sessionId = "session-1" as SessionId;
 
 function testSocketPath(): string {
   // Windows named pipes and POSIX sockets both accept an arbitrary path-like string here for
@@ -34,7 +36,13 @@ function decision(): PolicyDecision {
 }
 
 function req(): ExecutionChannelRequest {
-  return { identity, hostId: "host-1", parameters: { path: "/a" }, decision: decision() };
+  return {
+    identity,
+    hostId: "host-1",
+    parameters: { path: "/a" },
+    decision: decision(),
+    sessionId,
+  };
 }
 
 describe("NetExecutionChannelClient (DEC-047)", () => {

@@ -5,6 +5,7 @@ import type {
   ExecutionChannelResponse,
   PolicyDecision,
   SchemaFingerprint,
+  SessionId,
   ToolEntry,
   ToolIdentity,
   ToolOrigin,
@@ -13,6 +14,7 @@ import { handleToolCall, type ToolsCallDeps } from "./tools-call.js";
 
 const identity = "tool-1" as ToolIdentity;
 const fingerprint = "fp-1" as SchemaFingerprint;
+const sessionId = "session-1" as SessionId;
 const origin: ToolOrigin = { id: "mcp-fs", kind: "mcp-server" };
 
 const entry: ToolEntry = {
@@ -62,14 +64,20 @@ function makeDeps(overrides: Partial<ToolsCallDeps> = {}): ToolsCallDeps {
 describe("handleToolCall (DEC-045)", () => {
   it("unknown tool returns an error without evaluating policy", async () => {
     const deps = makeDeps({ resolveToolEntry: vi.fn(async () => undefined) });
-    const result = await handleToolCall("nope", {}, "host-1", deps);
+    const result = await handleToolCall("nope", {}, "host-1", sessionId, deps);
     expect(result.isError).toBe(true);
     expect(deps.evaluate).not.toHaveBeenCalled();
   });
 
   it("successful call returns the execution outcome", async () => {
     const deps = makeDeps();
-    const result = await handleToolCall("mcp-fs:read_file", { path: "/a" }, "host-1", deps);
+    const result = await handleToolCall(
+      "mcp-fs:read_file",
+      { path: "/a" },
+      "host-1",
+      sessionId,
+      deps,
+    );
     expect(result.isError).toBe(false);
   });
 
@@ -88,7 +96,7 @@ describe("handleToolCall (DEC-045)", () => {
       progressIntervalMs: 5,
     });
 
-    const callPromise = handleToolCall("mcp-fs:read_file", {}, "host-1", deps);
+    const callPromise = handleToolCall("mcp-fs:read_file", {}, "host-1", sessionId, deps);
     await new Promise((r) => setTimeout(r, 30));
     expect(vi.mocked(deps.sendProgress)).toHaveBeenCalled();
 
@@ -101,7 +109,7 @@ describe("handleToolCall (DEC-045)", () => {
 
   it("stops emitting progress once the call resolves", async () => {
     const deps = makeDeps({ progressIntervalMs: 5 });
-    await handleToolCall("mcp-fs:read_file", {}, "host-1", deps);
+    await handleToolCall("mcp-fs:read_file", {}, "host-1", sessionId, deps);
     const callsAtCompletion = vi.mocked(deps.sendProgress).mock.calls.length;
     await new Promise((r) => setTimeout(r, 30));
     expect(vi.mocked(deps.sendProgress).mock.calls.length).toBe(callsAtCompletion);
@@ -124,7 +132,7 @@ describe("handleToolCall (DEC-045)", () => {
       },
     });
 
-    const callPromise = handleToolCall("mcp-fs:read_file", {}, "host-1", deps);
+    const callPromise = handleToolCall("mcp-fs:read_file", {}, "host-1", sessionId, deps);
     controller.abort();
     const result = await callPromise;
 
@@ -143,7 +151,7 @@ describe("handleToolCall (DEC-045)", () => {
     controller.abort();
     const deps = makeDeps({ cancelled: controller.signal });
 
-    const result = await handleToolCall("mcp-fs:read_file", {}, "host-1", deps);
+    const result = await handleToolCall("mcp-fs:read_file", {}, "host-1", sessionId, deps);
     expect(result).toEqual({ isError: true, content: "Cancelled" });
   });
 
@@ -160,7 +168,7 @@ describe("handleToolCall (DEC-045)", () => {
       },
     });
 
-    const result = await handleToolCall("mcp-fs:read_file", {}, "host-1", deps);
+    const result = await handleToolCall("mcp-fs:read_file", {}, "host-1", sessionId, deps);
     expect(result.isError).toBe(true);
     expect(result.content).toContain("Not connected");
   });
@@ -179,8 +187,26 @@ describe("handleToolCall (DEC-045)", () => {
       },
     });
 
-    await handleToolCall("mcp-fs:read_file", { path: "/a; rm -rf /" }, "host-1", deps);
+    await handleToolCall("mcp-fs:read_file", { path: "/a; rm -rf /" }, "host-1", sessionId, deps);
     expect(captured?.parameters.path).toBe("/a; rm -rf /"); // preserved, not shell-interpreted here
     expect(captured?.identity).toBe(identity);
+  });
+
+  it("DEC-049: sessionId is propagated to Execution purely as correlation metadata", async () => {
+    let captured: ExecutionChannelRequest | undefined;
+    const deps = makeDeps({
+      executionClient: {
+        connect: vi.fn(async () => undefined),
+        request: vi.fn(async (req: ExecutionChannelRequest): Promise<ExecutionChannelResponse> => {
+          captured = req;
+          return { ok: true, outcome: { kind: "executed", exitCode: 0, stdout: "", stderr: "" } };
+        }),
+        cancel: vi.fn(async () => undefined),
+        close: vi.fn(async () => undefined),
+      },
+    });
+
+    await handleToolCall("mcp-fs:read_file", { path: "/a" }, "host-1", sessionId, deps);
+    expect(captured?.sessionId).toBe(sessionId);
   });
 });
