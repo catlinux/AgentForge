@@ -122,8 +122,14 @@ AES-256-GCM). Ningún otro proceso ve el valor en claro salvo en el momento de u
 corto que tú ejecutes una sola vez. Esto es intencional (DEC-033: sin sobrearquitectura para un
 caso de uso de un solo operador) — no es una limitación oculta.
 
-Necesitas ya creados: la clave SSH privada `ed25519` dedicada y el Personal Access Token de GitHub
-(ambos de la sección 1) — este paso solo los registra en el Broker, no los genera.
+**Antes de continuar, necesitas tener ya creados** (sección 1):
+
+- la clave SSH privada `ed25519` dedicada a AgentForge, y
+- el Personal Access Token de GitHub.
+
+El script `seed-secret.mjs` de más abajo **no genera ninguna de las dos** — solo lee la clave
+privada de donde la guardaste y registra su contenido (y el del PAT) en el Secrets Broker. Si
+todavía no las tienes, vuelve a la sección 1 antes de seguir.
 
 Para dar de alta un secreto, crea un script así (ajusta los valores) y ejecútalo **una vez**,
 apuntando al mismo `AGENTFORGE_DATA_DIR` que usarán los procesos reales:

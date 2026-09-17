@@ -123,9 +123,14 @@ other process ever sees the plaintext value except at the moment it is used.
 you run once. This is intentional (DEC-033: no over-engineering for a single-operator use case) —
 not a hidden limitation.
 
-You need the following already created: the dedicated `ed25519` SSH private key and the GitHub
-Personal Access Token (both from section 1) — this step only registers them with the Broker, it
-does not generate them.
+**Before continuing, you need to already have created** (section 1):
+
+- the dedicated `ed25519` SSH private key for AgentForge, and
+- the GitHub Personal Access Token.
+
+The `seed-secret.mjs` script below **generates neither of them** — it only reads the private key
+from wherever you saved it and registers its contents (and the PAT's) with the Secrets Broker. If
+you don't have them yet, go back to section 1 before continuing.
 
 To register a secret, write a script like this (adjust the values) and run it **once**, pointing
 at the same `AGENTFORGE_DATA_DIR` the real processes will use:
