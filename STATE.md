@@ -1,7 +1,7 @@
 # STATE.md — AgentForge
 
-**Última actualización:** 2026-09-17 (POST-F16 — Puesta en marcha real en Windows, INSPECT+
-EXECUTE+VERIFY completados — pendiente de autorización explícita de `git commit`/`git push`)
+**Última actualización:** 2026-09-17 (POST-F16 — asistente interactivo `setup.mjs`, INSPECT+
+PLAN+EXECUTE+VERIFY completados — pendiente de autorización explícita de `git commit`/`git push`)
 
 **Fase 16 (Stable Release) ya commiteada y pusheada** — commit `2d7a354` en `origin/master`,
 working tree limpio, verificado tras el push. Ver sección "Fase 16" en "Trabajo completado" para
@@ -10,8 +10,11 @@ el detalle completo.
 **POST-F16 — Puesta en marcha real en Windows (2026-09-17):** tarea práctica solicitada tras
 cerrar la Fase 16, fuera de la numeración de fases del roadmap — preparar AgentForge para
 instalación/uso real (no solo desarrollo) en un equipo Windows, conectado a Claude Code. Sin
-decisiones arquitectónicas nuevas ni reapertura de DEC-010 u otras decisiones cerradas. Detalle
-completo en la sección "POST-F16" de "Trabajo completado", más abajo.
+decisiones arquitectónicas nuevas ni reapertura de DEC-010 u otras decisiones cerradas. Incluye:
+manual de usuario (`docs/USER-GUIDE.md`/`.en.md`), 5º entrypoint del Dashboard, y el asistente
+interactivo `setup.mjs` (nuevo, este bloque) que automatiza dar de alta un host SSH o una cuenta
+GitHub sin editar JSON a mano, diseñado para crecer con futuros conectores. Detalle completo en la
+sección "POST-F16" de "Trabajo completado", más abajo.
 
 ## Proyecto
 
@@ -1320,6 +1323,61 @@ existencia del tag `v0.1.0`.
       Todos los directorios temporales de prueba eliminados al terminar; un proceso Node residual
       de una prueba manual anterior (identificado por `StartTime`, no confundido con procesos
       ajenos a esta sesión) fue detenido explícitamente antes de continuar.
+
+### POST-F16 (continuación) — asistente interactivo `setup.mjs` (INSPECT + PLAN + EXECUTE + VERIFY completados, 2026-09-17)
+- [x] Solicitado explícitamente por el usuario: un "instalador" que facilite activar conectores
+      (el actual y futuros) respondiendo preguntas y rellenando campos, pensado para crecer y para
+      ser fácil de invocar también por una IA. Dos preguntas resueltas antes de EXECUTE (vía
+      AskUserQuestion): alcance (elegido: "setup completo guiado" como visión a futuro, pero
+      "hagamos el simple" para esta iteración) y mecanismo (elegido, tras explicar ventajas de
+      cada opción: script Node interactivo, no un paquete `packages/cli` nuevo — evita comprometer
+      una arquitectura de CLI todavía no necesaria).
+- [x] Implementación: `setup.mjs` nuevo, en la raíz del repositorio, versionado (a diferencia del
+      script de un solo uso `seed-secret.mjs` del manual, que se pide borrar tras usar). Menú de
+      conectores registrados en un array (`CONNECTORS`) — añadir un conector futuro es añadir una
+      entrada, no reescribir el flujo de control. Reutiliza exactamente `MasterKeyStore`/
+      `SecretStore` (Secrets Broker) y el shape de `host-config.json`/`account-config.json` ya
+      documentado — ninguna lógica de negocio nueva. Cada conector: pide los campos, registra el
+      secreto real en el Broker, y fusiona (nunca sobrescribe) la entrada correspondiente en su
+      fichero de configuración, indexada por `hostId`/`accountId`. Nunca genera la clave SSH ni el
+      PAT — ambos deben existir ya (mismo requisito que el manual, sección 1).
+- [x] **Fallo real encontrado y corregido durante el propio EXECUTE, antes de VERIFY:**
+      `rl.question()` (tanto la API basada en callback de `node:readline` como la basada en
+      promesas de `node:readline/promises`) se cuelga de forma fiable, sin ningún error visible,
+      en la segunda pregunta consecutiva cuando stdin no es un TTY interactivo y ya recibió todo
+      su contenido — reproducido de forma determinista tanto en Git Bash como en PowerShell nativo
+      sobre este mismo Node 24.12.0, aislado con varios scripts mínimos hasta confirmar la causa
+      exacta: el evento `'end'` de stdin llega antes de que `readline` reanude la lectura para la
+      pregunta siguiente. Sustituido por una cola manual de líneas sobre el evento `'line'` de
+      `readline` (`createPrompter`), que no depende de `rl.question()` y se comprobó robusta en
+      ambos casos (pipe de test y, por construcción, terminal interactiva real). Sin este hallazgo,
+      el asistente se habría colgado de forma silenciosa en cualquier automatización o en según qué
+      configuraciones de terminal.
+- [x] Ocultación del PAT al teclearlo: `questionHidden` intercepta temporalmente la escritura al
+      stream de salida de `readline` mientras se captura la línea, igual que un prompt de
+      contraseña — verificado que el valor capturado coincide exactamente con lo introducido
+      (no corrompido por la intercepción) y que nunca aparece en la salida de consola.
+- [x] `eslint.config.js` ampliado: `setup.mjs` añadido al mismo bloque de globals Node
+      (`process`/`console`/`Buffer`) ya usado por `tests/integration/helpers/*.mjs` — mismo patrón
+      existente, sin nueva configuración.
+- [x] Documentación actualizada: `docs/USER-GUIDE.md`/`.en.md`, sección 4, con `setup.mjs`
+      presentado como opción recomendada y el script manual conservado como opción de
+      entendimiento/alternativa (no eliminado); sección 19 (limitaciones) matizada para reflejar
+      que ahora sí hay un asistente para dar de alta credenciales, aunque sin subcomandos de
+      listar/actualizar/borrar.
+- [x] Alcance respetado: no se generan claves SSH ni PATs; no se creó ningún paquete `packages/cli`
+      ni arquitectura de subcomandos; no se tocó ninguna decisión cerrada; no se ejecutó contra
+      sistemas remotos reales; las pruebas end-to-end (host SSH y cuenta GitHub, incluida la fusión
+      al añadir un segundo host sin perder el primero) usaron claves/tokens ficticios en
+      directorios temporales, eliminados después.
+- [x] **Verificado:** `pnpm run typecheck`/`lint`/`format` limpios; `pnpm run test` — 255/257
+      correctos (2 skip POSIX heredados, sin cambios); `pnpm run build` correcto en los 8
+      paquetes; `pnpm run test:integration` — 4/4 correctos, sin cambios (el script no toca código
+      de los paquetes). Flujo completo probado de verdad, no solo revisado: alta de cuenta GitHub
+      (secreto registrado y verificado leyéndolo de vuelta del Broker, valor exacto confirmado) y
+      alta de host SSH (incluida la fusión de un segundo host sin perder el primero). Un
+      `seed-secret.mjs` residual de una sesión de pruebas anterior, no versionado, fue eliminado
+      del repositorio al detectarlo durante el propio VERIFY.
 
 ## Documentación sincronizada
 

@@ -151,12 +151,35 @@ not a hidden limitation.
 - the dedicated `ed25519` SSH private key for AgentForge, and
 - the GitHub Personal Access Token.
 
-The `seed-secret.mjs` script below **generates neither of them** — it only reads the private key
-from wherever you saved it and registers its contents (and the PAT's) with the Secrets Broker. If
-you don't have them yet, go back to section 1 before continuing.
+### Recommended option: the `setup.mjs` wizard
 
-To register a secret, write a script like this (adjust the values) and run it **once**, pointing
-at the same `AGENTFORGE_DATA_DIR` the real processes will use:
+The simplest way to register an SSH host or a GitHub account is the interactive `setup.mjs`
+wizard, included at the repository root. It asks you questions on the console (where's your key,
+which host, which account...) and does exactly what the rest of this section describes: it
+registers the secret with the Secrets Broker and writes the matching entry into
+`host-config.json`/`account-config.json` — it never generates the SSH key or the PAT for you,
+only registers them.
+
+After `pnpm run build`, from the repository root:
+
+```
+node setup.mjs
+```
+
+The wizard shows you a menu, asks for the data one field at a time, and while you paste the PAT
+**it doesn't echo it to the screen** (same as typing a password). You can run it more than once to
+add several hosts or accounts — it never overwrites what you already had, it adds or updates by
+`hostId`/`accountId`.
+
+It's built to grow: as new connectors are added to AgentForge in the future, they'll show up as
+another option in the same menu.
+
+### Manual option: understand what it does, or do it yourself step by step
+
+If you'd rather see exactly what gets registered (or the wizard doesn't cover your case), you can
+do it yourself with a short script. This is exactly what `setup.mjs` does automatically for you —
+to register a secret by hand, write a script like this (adjust the values) and run it **once**,
+pointing at the same `AGENTFORGE_DATA_DIR` the real processes will use:
 
 Save the script as `seed-secret.mjs` **at the repository root** (the relative import below
 depends on that location — it will not work if you move it elsewhere or run it outside the repo):
@@ -543,8 +566,10 @@ lost.
   any real operating system — see `decisions/DECISIONS.md`, DEC-080.
 - **No installer or OS service management.** Every process is started by hand in its own terminal
   (section 10) — no integration with Windows Task Scheduler or any service manager.
-- **No secrets-administration CLI.** Registering a secret requires a short script (section 4), not
-  a dedicated command.
+- **No secrets-administration CLI with subcommands.** The `setup.mjs` wizard (section 4) covers
+  registering an SSH host or a GitHub account interactively, but there are no commands to list,
+  update, or delete existing secrets — that still requires a short script using the Broker's API
+  directly.
 - **No automatic tool discovery.** The Registry (section 7) is edited by hand — there is no
   process today that queries an external MCP server and fills `registry-cache.json`
   automatically.

@@ -12,10 +12,11 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // tests/integration/helpers/*.mjs are real Node.js process entrypoints (Fase 14, DEC-072),
-    // run directly by `node` — not part of the TypeScript project graph, so they need Node's own
-    // globals rather than the browser-oriented defaults `js.configs.recommended` assumes.
-    files: ["tests/integration/helpers/*.mjs"],
+    // tests/integration/helpers/*.mjs and setup.mjs are real Node.js process entrypoints (Fase
+    // 14/DEC-072, and the Fase-16-style interactive setup wizard) run directly by `node` — not
+    // part of the TypeScript project graph, so they need Node's own globals rather than the
+    // browser-oriented defaults `js.configs.recommended` assumes.
+    files: ["tests/integration/helpers/*.mjs", "setup.mjs"],
     languageOptions: {
       globals: {
         process: "readonly",

@@ -150,12 +150,35 @@ caso de uso de un solo operador) — no es una limitación oculta.
 - la clave SSH privada `ed25519` dedicada a AgentForge, y
 - el Personal Access Token de GitHub.
 
-El script `seed-secret.mjs` de más abajo **no genera ninguna de las dos** — solo lee la clave
-privada de donde la guardaste y registra su contenido (y el del PAT) en el Secrets Broker. Si
-todavía no las tienes, vuelve a la sección 1 antes de seguir.
+### Opción recomendada: el asistente `setup.mjs`
 
-Para dar de alta un secreto, crea un script así (ajusta los valores) y ejecútalo **una vez**,
-apuntando al mismo `AGENTFORGE_DATA_DIR` que usarán los procesos reales:
+La forma más simple de dar de alta un host SSH o una cuenta de GitHub es el asistente
+interactivo `setup.mjs`, incluido en la raíz del repositorio. Te hace preguntas por consola
+(dónde está tu clave, qué host, qué cuenta...) y hace por ti exactamente lo que describe el resto
+de esta sección: registra el secreto en el Secrets Broker y escribe la entrada correspondiente en
+`host-config.json`/`account-config.json` — nunca genera la clave SSH ni el PAT por ti, solo los
+registra.
+
+Tras `pnpm run build`, desde la raíz del repositorio:
+
+```
+node setup.mjs
+```
+
+El asistente te muestra un menú, te pide los datos uno a uno, y al pegar el PAT **no lo muestra en
+pantalla** (igual que al escribir una contraseña). Puedes ejecutarlo varias veces para añadir más
+de un host o cuenta — nunca sobrescribe lo que ya tenías, añade o actualiza por `hostId`/
+`accountId`.
+
+Está pensado para crecer: cuando se añadan conectores nuevos a AgentForge en el futuro, aparecerán
+como una opción más en el mismo menú.
+
+### Opción manual: entender qué hace, o hacerlo tú mismo paso a paso
+
+Si prefieres ver exactamente qué se registra (o el asistente no cubre tu caso), puedes hacerlo tú
+mismo con un script corto. Esto es lo que `setup.mjs` hace automáticamente para ti — para dar de
+alta un secreto a mano, crea un script así (ajusta los valores) y ejecútalo **una vez**, apuntando
+al mismo `AGENTFORGE_DATA_DIR` que usarán los procesos reales:
 
 Guarda el script como `seed-secret.mjs` **en la raíz del repositorio** (el import relativo de
 abajo depende de esa ubicación — no funciona si lo mueves a otra carpeta o fuera del repo):
@@ -542,8 +565,10 @@ resto de procesos.
 - **Sin instalador ni gestión de servicio del sistema operativo.** Cada proceso se arranca a mano
   en su propia terminal (sección 10) — no hay integración con el Programador de tareas de Windows
   ni con ningún gestor de servicios.
-- **Sin CLI de administración de secretos.** Dar de alta un secreto requiere un script corto
-  (sección 4), no un comando dedicado.
+- **Sin CLI de administración de secretos con subcomandos.** El asistente `setup.mjs` (sección 4)
+  cubre dar de alta un host SSH o una cuenta de GitHub de forma interactiva, pero no hay comandos
+  para listar, actualizar ni borrar secretos existentes — para eso sigue haciendo falta un script
+  corto usando la API del Broker directamente.
 - **Sin descubrimiento automático de tools.** El Registry (sección 7) se edita a mano — no existe
   hoy ningún proceso que consulte un servidor MCP externo y rellene `registry-cache.json`
   automáticamente.
