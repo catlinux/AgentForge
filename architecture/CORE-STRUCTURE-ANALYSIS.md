@@ -6,8 +6,8 @@ Este documento se conserva como el análisis y justificación detrás de esas de
 se ha creado ninguna carpeta, fichero de configuración ni código — ver DEC-012.**
 
 Complementa `architecture/ARCHITECTURE.md` (Fase 1) y `architecture/TECH-STACK-ANALYSIS.md`
-(DEC-007: TypeScript/Node.js). Traducción al inglés pospuesta, igual que
-`TECH-STACK-ANALYSIS.md`, hasta que la documentación esté más estable.
+(DEC-007: TypeScript/Node.js). Traducción al inglés disponible en
+`architecture/CORE-STRUCTURE-ANALYSIS.en.md` (DEC-079, Fase 15).
 
 **Fecha:** 2026-09-16.
 

@@ -1,9 +1,12 @@
 # AgentForge
 
-**Project status: 13 phases complete (research, governance, core architecture, Tool Registry,
-Tool Discovery, Policy Engine, Secrets Broker, remote SSH execution, MCP integration, Sessions,
-Audit Log, Connectors, Web Dashboard, and Security hardening). Real TypeScript/Node.js
-implementation, with automated tests. See `STATE.md` for the full, up-to-date detail.**
+**Project status: release `0.1.0` — 15 phases complete (research, governance, core architecture,
+Tool Registry, Tool Discovery, Policy Engine, Secrets Broker, remote SSH execution, MCP
+integration, Sessions, Audit Log, Connectors, Web Dashboard, Security hardening, Testing and
+integration, and Documentation/release). Real TypeScript/Node.js implementation, with automated
+tests and CI. `0.1.0` is the first internal release of the project's current state — it does not
+imply AgentForge is already a complete production product (there is still no real,
+deployable production `main`/CLI). See `STATE.md` for the full, up-to-date detail.**
 
 [Versión en español](README.md)
 
@@ -74,10 +77,13 @@ well.
 | Secrets Broker, remote SSH execution, MCP integration | **Completed and implemented** (Phases 6–8) |
 | Sessions, Audit Log, Connectors, Web Dashboard | **Completed and implemented** (Phases 9–12) |
 | Security hardening | **Completed** (Phase 13) |
-| Testing and integration | In progress (Phase 14) |
+| Testing and integration | **Completed** (Phase 14) |
+| Documentation and release | **Completed** (Phase 15) — release `0.1.0` |
 | Software implementation | **Yes — 8 real TypeScript/Node.js packages, with automated tests** |
 | Git repository | Initialized, with the full history of every phase |
-| Remote repository | `https://github.com/catlinux/AgentForge` (active, synced) |
+| Remote repository | `https://github.com/catlinux/AgentForge` — visibility decided as Public (DEC-076), real change pending the user's application |
+| CI/CD | GitHub Actions, Linux/Windows matrix (DEC-078) |
+| License | MIT (see `LICENSE`) |
 
 See `STATE.md` for the detailed, continuously updated project status — it is the single source of
 truth on real progress; this README is updated at every phase but may occasionally lag behind if
@@ -104,8 +110,8 @@ explicit, separate authorization; all verification runs against mocks/fixtures)
 Every component runs as a separate process, communicated over its own IPC channels (named pipe on
 Windows, Unix domain socket on Linux/macOS), with uniform fail-closed behavior on any ambiguity.
 Full detail for every decision lives in `architecture/ARCHITECTURE.en.md` (and its Spanish
-equivalent `architecture/ARCHITECTURE.md`) and in `decisions/DECISIONS.md` — over 70 approved
-decisions across 13 phases. The original Phase 0 document, `architecture/ARCHITECTURE-DRAFT.md`,
+equivalent `architecture/ARCHITECTURE.md`) and in `decisions/DECISIONS.md` — over 80 approved
+decisions across 15 phases. The original Phase 0 document, `architecture/ARCHITECTURE-DRAFT.md`,
 is kept as a historical reference.
 
 ## Core principles
@@ -143,12 +149,13 @@ best project" or to model AgentForge after any single one of them. See
 
 ## Next steps
 
-**Phase 14 — Testing and integration** is in progress: real cross-process integration tests
-(MCP-server<->Execution<->Secrets Broker, with SSH and HTTP simulated locally, never against real
-remote systems), informative code coverage. See `ROADMAP.md` for the full planned scope.
+The 15 phases planned for this stage of the project are complete. The ROADMAP contemplates
+Phase 16 (Stable Release) as the next proposed step, not yet started or authorized. See
+`ROADMAP.md` for the full plan.
 
-Minor decisions still pending: project license, repository visibility, the Phase 0 language
-inconsistency, CI/CD (planned for Phase 15). See `decisions/DECISIONS.md`, "PENDING" section.
+One minor decision still pending: the Phase 0 language inconsistency (research written in
+Catalan versus the rest of the project's Spanish/English) — deliberately left unresolved. See
+`decisions/DECISIONS.md`, "PENDING" section.
 
 ## Project layout
 
@@ -156,6 +163,8 @@ inconsistency, CI/CD (planned for Phase 15). See `decisions/DECISIONS.md`, "PEND
 AgentForge/
 ├── .claude/
 │   └── CLAUDE.md              — operating manual for Claude Code
+├── .github/
+│   └── workflows/ci.yml        — CI (GitHub Actions, Linux/Windows matrix)
 ├── docs/
 │   └── research/               — Phase 0 research (Catalan): Composio, MCP, Claude Code, sources
 ├── research/
@@ -163,9 +172,11 @@ AgentForge/
 ├── architecture/
 │   ├── ARCHITECTURE.md         — full architecture (Spanish, primary)
 │   ├── ARCHITECTURE.en.md      — full architecture (English)
+│   ├── TECH-STACK-ANALYSIS.md/.en.md      — technology stack analysis
+│   ├── CORE-STRUCTURE-ANALYSIS.md/.en.md  — core structure analysis
 │   └── ARCHITECTURE-DRAFT.md   — original Phase 0 proposal (Catalan, historical)
 ├── decisions/
-│   └── DECISIONS.md            — 70+ approved decisions across 13 phases
+│   └── DECISIONS.md            — 80+ approved decisions across 15 phases
 ├── packages/
 │   ├── shared/                 — shared types, contracts, Audit Log, utilities
 │   ├── core/                   — Tool Registry, Tool Discovery, Policy Engine
@@ -176,6 +187,7 @@ AgentForge/
 │   └── dashboard/              — read-only web interface
 ├── tests/
 │   └── integration/            — real cross-process integration tests (Phase 14)
+├── LICENSE                     — MIT
 ├── STATE.md                    — current project state (source of truth)
 ├── README.md / README.en.md    — this document
 ├── CHANGELOG.md
@@ -187,6 +199,4 @@ AgentForge/
 
 ## License
 
-**Decision pending.** The project does not yet have an assigned license. No license should be
-assumed until the user decides one explicitly. See `DEVELOPMENT.md` and
-`decisions/DECISIONS.md` for tracking of this pending decision.
+**MIT** (DEC-075, Phase 15). See `LICENSE` at the repository root.

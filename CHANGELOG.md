@@ -1,15 +1,32 @@
 # Changelog
 
-Todas las entradas relevantes del proyecto se documentan en este archivo. El proyecto todavía no
-tiene versiones publicadas (no hay releases ni tags) — todo el trabajo actual vive bajo
-`Unreleased`.
+Todas las entradas relevantes del proyecto se documentan en este archivo. Formato inspirado en
+[Keep a Changelog](https://keepachangelog.com/); el proyecto usa [SemVer](https://semver.org/)
+desde la release `0.1.0` (Fase 15, DEC-077) — anterior a esa release, las versiones de
+`package.json` se mantuvieron en `0.0.0` sin significado semántico.
 
-Formato inspirado en [Keep a Changelog](https://keepachangelog.com/), adaptado: como no hay
-releases todavía, no se usa versionado semántico hasta la primera release.
+**Nota sobre `0.1.0` (DEC-077):** marca la primera release interna del estado actual del
+proyecto tras 14 fases de desarrollo — no implica que AgentForge sea ya un producto de producción
+completo (sigue sin existir un `main`/CLI de producción real desplegable, ver `STATE.md`).
 
 ## [Unreleased]
 
-### Fase 14 — Testing e integración (2026-09-17, en curso)
+## [0.1.0] - 2026-09-17
+
+### Fase 15 — Documentación y release (completada)
+
+#### Añadido
+- `LICENSE` — MIT (DEC-075).
+- `.github/workflows/ci.yml` — CI en GitHub Actions, matriz Linux/Windows (DEC-078).
+- `architecture/TECH-STACK-ANALYSIS.en.md`, `architecture/CORE-STRUCTURE-ANALYSIS.en.md` —
+  traducción al inglés (DEC-079).
+
+#### Decidido
+- DEC-075 a DEC-079: licencia (MIT), visibilidad del repositorio (Público — decisión documentada,
+  cambio real en GitHub no ejecutado en esta fase), versionado SemVer desde `0.1.0`, CI/CD,
+  traducción de los dos documentos de arquitectura pendientes.
+
+### Fase 14 — Testing e integración (2026-09-17, completada)
 
 #### Añadido
 - `tests/integration/` — tests de integración real entre procesos (MCP-server↔Execution↔Secrets

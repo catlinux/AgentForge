@@ -1,9 +1,8 @@
 # STATE.md — AgentForge
 
-**Última actualización:** 2026-09-17 (Fase 14 — Testing e integración, INSPECT+PLAN+EXECUTE+VERIFY
-completados, pendiente de autorización de commit y push. Además: corregida documentación de
-gobernanza — README.md/README.en.md/CHANGELOG.md/CONTRIBUTING.md/DEVELOPMENT.md llevaban
-congelados desde la Fase 0.5, señalado explícitamente por el usuario a mitad de esta fase)
+**Última actualización:** 2026-09-17 (Fase 15 — Documentación y release, INSPECT+PLAN+EXECUTE+
+VERIFY completados, release `0.1.0` — pendiente de autorización de commit, push, y creación/push
+del tag `v0.1.0`)
 
 ## Proyecto
 
@@ -15,45 +14,41 @@ copiar).
 
 ## Fase actual
 
-**Fase 14 — Testing e integración**
+**Fase 15 — Documentación y release**
 
-**Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 3 decisiones aprobadas
-(DEC-072: tests de integración en directorio separado `tests/integration/`, workspace pnpm propio;
-DEC-073: cobertura de código `@vitest/coverage-v8`, informativa, sin umbral bloqueante; DEC-074:
-CI/CD fuera de alcance de esta fase, pospuesto a la Fase 15). Ver `decisions/DECISIONS.md` para el
-registro formal.
+**Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 5 decisiones aprobadas
+(DEC-075: licencia MIT; DEC-076: visibilidad del repositorio decidida como Público — decisión
+documentada, cambio real en GitHub no ejecutado en esta fase, a aplicar por el usuario cuando lo
+considere oportuno; DEC-077: versionado SemVer desde `0.1.0`, primera release interna del estado
+actual del proyecto, explícitamente no una afirmación de producto de producción completo; DEC-078:
+CI/CD en GitHub Actions, matriz Linux/Windows; DEC-079: traducción al inglés de
+`TECH-STACK-ANALYSIS.md`/`CORE-STRUCTURE-ANALYSIS.md`). Durante la aprobación del PLAN se detectó
+y resolvió explícitamente una contradicción real entre dos mensajes sucesivos del usuario sobre
+DEC-L (visibilidad) — se preguntó de nuevo antes de proceder, confirmándose Público. Ver
+`decisions/DECISIONS.md` para el registro formal.
 
-**Pausa documental a mitad de fase (a petición explícita del usuario):** el usuario señaló que
-`README.md`, `README.en.md`, `CHANGELOG.md` y `CONTRIBUTING.md` llevaban congelados en el estado
-de la Fase 0.5 (2026-09-16) — afirmando cosas como "ninguna línea de software funcional
-implementada" o "repositorio Git no inicializado" pese a llevar 13 fases completadas y GitHub
-activo. Corregidos los 4 documentos para reflejar el estado real, además de las cabeceras
-obsoletas de `DEVELOPMENT.md` (secciones "Cómo ejecutar el proyecto", "Control de versiones",
-"Licencia", "Testing", "Variables de entorno", todas con afirmaciones de "no aplica todavía" que
-llevaban 12 fases sin actualizarse) y un comentario de código obsoleto en
-`packages/connector-github/src/execute.ts` (seguía diciendo que DEC-010 era un placeholder sin
-canal real, resuelto ya por DEC-070 en Fase 13). Retomada la implementación de la Fase 14
-inmediatamente después, sin pérdida de contexto.
+**Implementación:** `LICENSE` (MIT, titular "catlinux" — confirmado explícitamente con el usuario
+tras una primera propuesta incorrecta); 8 `package.json` (raíz + 7 paquetes de `packages/`)
+pasan de `0.0.0` a `0.1.0` (`tests/integration` se mantiene en `0.0.0`, no es una unidad de
+release); `CHANGELOG.md` gana una entrada `[0.1.0] - 2026-09-17` real, reemplazando la sección
+`[Unreleased]` ya cerrada, con una nota explícita sobre el significado de `0.1.0`;
+`.github/workflows/ci.yml` nuevo (matriz `ubuntu-latest`/`windows-latest`, ejecuta
+`typecheck`/`lint`/`format`/`test`/`build`/`test:integration` en cada push/PR a `master`,
+validado localmente como YAML sintácticamente correcto); `architecture/TECH-STACK-ANALYSIS.en.md`
+y `architecture/CORE-STRUCTURE-ANALYSIS.en.md` nuevos (traducción completa, contenido equivalente
+no traducción automática, mismo criterio que `README.en.md`/`ARCHITECTURE.en.md`).
+`README.md`/`README.en.md`/`DEVELOPMENT.md`/`CONTRIBUTING.md`/`ROADMAP.md` actualizados para
+reflejar licencia/visibilidad/versión/CI/CD ya decididos, sin dejar ninguna afirmación de
+"pendiente de decisión" en los puntos ya resueltos.
 
-**Implementación:** `tests/integration/` (nuevo workspace pnpm, `vitest.config.ts` propio con
-`fileParallelism: false` — cada test arranca su propio Secrets Broker en el canal fijo real de
-producción, DEC-047/070, así que dos ficheros de test no pueden correr en paralelo entre sí sin
-colisionar); `helpers/spawn-process.ts` (arranque/apagado de procesos reales, espera de señal
-`ready` en stdout); `helpers/mock-ssh-server.ts` (servidor SSH real vía `ssh2.Server`, loopback,
-claves ed25519 efímeras); `helpers/mock-github-server.ts` (servidor HTTP real vía `node:http`,
-loopback); `helpers/secrets-broker-process.mjs`/`execution-ssh-process.mjs`/
-`connector-github-process.mjs` (entrypoints de proceso solo-para-test, nunca `main`/CLI de
-producción); 2 ficheros de test (`execution-ssh-secrets-broker.test.ts`,
-`connector-github-secrets-broker.test.ts`), 4 casos en total: flujo completo real (MCP-channel↔
-Execution/Connector real↔Secrets Broker real↔borde externo simulado) y fail-closed sin Secrets
-Broker disponible, para cada uno de los dos Execution Backends. `vitest.config.ts` raíz nuevo
-(configuración de cobertura, ya que `defineWorkspace()` no la admite directamente). Script
-`pnpm run test:coverage`/`pnpm run test:integration` en el `package.json` raíz.
+**Verificación real de la ejecución de CI en GitHub Actions no realizada por este agente en esta
+fase** — el usuario indicó explícitamente que la revisará él mismo tras el push, sin necesidad de
+que se le notifique.
 
-**Ningún sistema remoto real tocado** — el servidor SSH y el servidor HTTP de los tests son
-procesos reales pero locales (loopback), nunca Debian de casa, VPS Contabo, ni la API real de
-GitHub. Fases 1-13 siguen vigentes sin cambios estructurales, salvo la corrección del comentario
-obsoleto ya mencionada.
+**Ningún sistema remoto real tocado.** No se ha ejecutado ningún cambio real de visibilidad en
+GitHub (DEC-076 queda documentada, no aplicada). Fases 1-14 siguen vigentes sin cambios
+estructurales — solo metadatos de versión, documentación, y un workflow de CI nuevo que ejecuta
+los mismos comandos ya usados en cada VERIFY anterior.
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
@@ -67,14 +62,15 @@ APROBADAS E IMPLEMENTADAS (Fase 9: DEC-048 a DEC-051) + AUDIT LOG APROBADO E IMP
 (Fase 10: DEC-052 a DEC-057) + CONNECTORS APROBADO E IMPLEMENTADO (Fase 11: DEC-058 a DEC-063) +
 DASHBOARD WEB APROBADO E IMPLEMENTADO (Fase 12: DEC-064 a DEC-069) + HARDENING DE SEGURIDAD
 APROBADO E IMPLEMENTADO (Fase 13: DEC-070 a DEC-071) + TESTING E INTEGRACIÓN APROBADO E
-IMPLEMENTADO (Fase 14: DEC-072 a DEC-074). Resto documentado como PROPOSAL/OPEN QUESTION en
+IMPLEMENTADO (Fase 14: DEC-072 a DEC-074) + DOCUMENTACIÓN Y RELEASE APROBADO E IMPLEMENTADO
+(Fase 15: DEC-075 a DEC-079, release `0.1.0`). Resto documentado como PROPOSAL/OPEN QUESTION en
 `architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 14 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
-y de autorización explícita y separada de `git commit` y `git push` (todavía no solicitadas ni
-concedidas para esta fase).
+Fase 15 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
+y de autorización explícita y separada de `git commit`, `git push`, y creación/push del tag
+`v0.1.0` (todavía no solicitadas ni concedidas para esta fase).
 
 ## Trabajo completado
 
@@ -1090,6 +1086,64 @@ decisión automática.
       modificados, directorio `tests/` completo y `vitest.config.ts` sin trackear). **Pendiente:**
       autorización explícita y separada de `git commit` y de `git push` — todavía no concedidas.
 
+### Fase 15 — Documentación y release (INSPECT + PLAN + EXECUTE + VERIFY completados, 2026-09-17)
+- [x] INSPECT completo: roadmap/estado real coinciden; identificada la Fase 15 como siguiente
+      pendiente; confirmado que incluye CI/CD explícitamente (DEC-074, Fase 14); inventario de
+      bloqueos genuinamente pendientes desde Fase 0.5/1 (licencia, visibilidad del repositorio);
+      confirmado `0.0.0` en los 8 `package.json`, sin tags de Git; confirmada ausencia de
+      `LICENSE`/`CODE_OF_CONDUCT.md`.
+- [x] PLAN presentado con 4 decisiones candidatas (DEC-K/L/M/N del PLAN) presentadas como
+      preguntas directas al usuario, sin proponer valores por defecto en licencia/visibilidad
+      (decisiones de producto/legal, no técnicas). Aprobado tras resolver las 4 preguntas.
+- [x] **Contradicción detectada y resuelta antes de proceder:** el usuario cambió de opinión sobre
+      la visibilidad del repositorio entre dos mensajes sucesivos ("de momento lo dejo público" vs.
+      una aprobación de PLAN posterior que decía "el repositorio permanece privado"). Se preguntó
+      explícitamente de nuevo antes de tocar nada — confirmado **Público**.
+- [x] **DEC-075** — Licencia: MIT. Titular del copyright verificado explícitamente con el usuario
+      (propuesta inicial incorrecta "Marc Sanchez (catlinux)", corregida a "catlinux" tras
+      preguntar).
+- [x] **DEC-076** — Visibilidad del repositorio: Público. Decisión documentada; el cambio real en
+      GitHub **no se ejecutó** en esta fase — el propio usuario indicó "de momento lo dejo
+      público" sin pedir la aplicación real vía `gh`/API.
+- [x] **DEC-077** — Versionado SemVer desde `0.1.0`, con precisión explícita del usuario: primera
+      release interna del estado actual, no afirmación de producto de producción completo.
+- [x] **DEC-078** — CI/CD: GitHub Actions, matriz Linux/Windows, solicitado explícitamente por el
+      usuario ("que sea correcto para las compilaciones de linux i windows"); usuario indicó no
+      necesitar notificación de la verificación real tras el push.
+- [x] **DEC-079** — Traducción al inglés de `TECH-STACK-ANALYSIS.md`/`CORE-STRUCTURE-ANALYSIS.md`.
+- [x] `decisions/DECISIONS.md` actualizado con DEC-075 a DEC-079; sección PENDIENTE revisada
+      (licencia y visibilidad marcadas como resueltas, inconsistencia de idioma de Fase 0 sigue
+      genuinamente pendiente sin cambios).
+- [x] `ROADMAP.md`, `STATE.md`, `DEVELOPMENT.md`, `README.md`/`.en.md`, `CONTRIBUTING.md`
+      sincronizados: ninguna afirmación de "licencia/visibilidad pendiente" queda en ningún
+      documento; conteo de decisiones/fases actualizado (81 DEC, 15 fases).
+- [x] Implementación: `LICENSE` (MIT); 8 `package.json` a `0.1.0` (`tests/integration` excluido
+      deliberadamente, no es unidad de release); `CHANGELOG.md` con entrada `[0.1.0]` real;
+      `.github/workflows/ci.yml` (matriz Linux/Windows, mismos comandos que cada VERIFY local);
+      `architecture/TECH-STACK-ANALYSIS.en.md`, `architecture/CORE-STRUCTURE-ANALYSIS.en.md`
+      (traducción completa); notas de traducción disponible añadidas a ambos documentos
+      originales en español.
+- [x] Alcance respetado: no se construyó ningún `main`/CLI de producción real; no se publicó
+      ningún paquete en npm/registro; no se creó `CODE_OF_CONDUCT.md`; no se tradujo la
+      investigación de la Fase 0 (catalán); ningún sistema remoto real tocado; ningún cambio real
+      de visibilidad ejecutado en GitHub.
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 9 paquetes/proyectos; `pnpm run lint`
+      sin errores; `pnpm run format` correcto (YAML de CI incluido, sin cambios necesarios;
+      `LICENSE` sin parser de Prettier, esperado y correcto al no tener extensión); `pnpm run
+      test` — 250/252 correctos (2 omitidos en Windows, heredados de Fase 6), sin cambios; `pnpm
+      run build` correcto en los 8 paquetes tras el bump de versión; `pnpm run test:integration`
+      — 4/4 correctos; `pnpm install --frozen-lockfile` correcto (`pnpm-lock.yaml` sin cambios,
+      como se esperaba — el bump de versión no afecta la resolución de dependencias); YAML de CI
+      validado sintácticamente de forma independiente (parser `yaml` de npm, instalado
+      temporalmente fuera del proyecto solo para la validación, no añadido como dependencia); grep
+      de secretos/hosts reales sin coincidencias nuevas (las menciones a "Debian"/"Contabo" en los
+      documentos traducidos son referencias conceptuales ya aprobadas, no credenciales ni IPs);
+      `git status` revisado en su totalidad (17 ficheros modificados, 4 ficheros/directorios
+      nuevos, coincide exactamente con la implementación descrita). **Pendiente:** autorización
+      explícita y separada de `git commit`, `git push`, y creación/push del tag `v0.1.0` —
+      todavía no concedidas. La verificación real de la ejecución de CI en GitHub Actions queda a
+      cargo del usuario tras el push, según su propia indicación explícita.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -1204,6 +1258,12 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-072** — Tests de integración en directorio separado `tests/integration/`.
 - **DEC-073** — Cobertura de código informativa, sin umbral bloqueante.
 - **DEC-074** — CI/CD fuera de alcance de la Fase 14, pospuesto a la Fase 15.
+- **DEC-075** — Licencia del proyecto: MIT.
+- **DEC-076** — Visibilidad del repositorio: Público (decisión documentada, cambio real pendiente
+  de aplicación por el usuario).
+- **DEC-077** — Versionado SemVer desde `0.1.0`, primera release interna del estado actual.
+- **DEC-078** — CI/CD: GitHub Actions, matriz Linux/Windows.
+- **DEC-079** — Traducción al inglés de `TECH-STACK-ANALYSIS.md`/`CORE-STRUCTURE-ANALYSIS.md`.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -1295,50 +1355,49 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `286be02158cb879a9b4adc9c840d669d7276382f` (corto: `286be02`) — Fase 13, último commit real
-  en `origin/master` al momento de escribir esto.
+- Hash: `1c24243e7046bd141f3613d4564fea4286f68714` (corto: `1c24243`) — Fase 14, último commit
+  real en `origin/master` al momento de escribir esto.
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `feat+docs: implementa Hardening de seguridad — Fase 13 (DEC-070, DEC-071)`
-- Commits anteriores: `63cf9e2` (Fase 12), `b301606` (Fase 11), `8d6670e` (correcciones Fase 10
-  tras revisión de código real), `30ee62a` (Fase 10 — primera implementación), `5c4833d` (Fase 9),
-  `6bdec65` (Fase 8), `86571b7` (Fase 7), `b48670d` (Fase 6), `2411dc3` (Fase 5), `624581e`
-  (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7),
-  `c671bef` (Fase 0 + Fase 0.5).
-- **Los cambios de la Fase 14 (Testing e integración, DEC-072 a DEC-074, más las correcciones de
-  documentación de gobernanza) están en el working tree, sin commitear todavía** — pendientes de
-  autorización explícita y separada de `git commit`/`git push`.
+- Mensaje: `feat+docs: implementa Testing e integración — Fase 14 (DEC-072 a DEC-074)`
+- Commits anteriores: `286be02` (Fase 13), `63cf9e2` (Fase 12), `b301606` (Fase 11), `8d6670e`
+  (correcciones Fase 10 tras revisión de código real), `30ee62a` (Fase 10 — primera
+  implementación), `5c4833d` (Fase 9), `6bdec65` (Fase 8), `86571b7` (Fase 7), `b48670d` (Fase 6),
+  `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2), `2922629`
+  (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
+- **Los cambios de la Fase 15 (Documentación y release, DEC-075 a DEC-079, release `0.1.0`) están
+  en el working tree, sin commitear todavía** — pendientes de autorización explícita y separada de
+  `git commit`/`git push`, y de la creación/push del tag `v0.1.0` (autorización separada adicional,
+  como cualquier acción con efecto en el repositorio remoto).
 
 ## Estado del push
 
-- `master` sincronizado con `origin/master` en `286be02` (Fase 13) al inicio de esta fase. Los
-  cambios de la Fase 14 son locales, todavía sin commitear ni pushear.
+- `master` sincronizado con `origin/master` en `1c24243` (Fase 14) al inicio de esta fase. Los
+  cambios de la Fase 15 son locales, todavía sin commitear ni pushear. Ningún tag existe todavía
+  en el repositorio.
 
 ## Próxima acción recomendada
 
-1. **Fase 14 (Testing e integración) completada localmente** — INSPECT + PLAN + EXECUTE + VERIFY
-   completados (2026-09-17): 3 decisiones aprobadas (DEC-072 a DEC-074), tests de integración real
-   entre procesos implementados y verificados (typecheck/lint/format/test/test:integration/
-   test:coverage/build limpios). Incluye además la corrección de documentación de gobernanza
-   desactualizada (README/CHANGELOG/CONTRIBUTING/DEVELOPMENT), señalada explícitamente por el
-   usuario a mitad de la fase. Pendiente de presentar el resultado de VERIFY al usuario y de
-   autorización explícita y separada de `git commit` y `git push` — todavía no solicitadas ni
+1. **Fase 15 (Documentación y release) completada localmente** — INSPECT + PLAN + EXECUTE +
+   VERIFY completados (2026-09-17): 5 decisiones aprobadas (DEC-075 a DEC-079), licencia MIT,
+   visibilidad Público (documentada, no aplicada en GitHub), release `0.1.0`, CI/CD, traducciones.
+   Pendiente de presentar el resultado de VERIFY al usuario y de autorización explícita y separada
+   de `git commit`, `git push`, y creación/push del tag `v0.1.0` — todavía no solicitadas ni
    concedidas.
-2. Siguiente fase pendiente del ROADMAP tras cerrar la Fase 14: **Fase 15 — Documentación y
-   release**, que incluye ahora explícitamente CI/CD (pospuesto desde la Fase 14, DEC-074).
-3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
-   del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
-   `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`; el transporte IPC real Core↔Secrets
-   Broker (DEC-010) sigue sin implementar (distinto del canal Execution↔Secrets Broker de DEC-070,
-   ya implementado, y del canal MCP↔Execution de DEC-047, ya implementado); el usuario de sistema
-   dedicado en cada host remoto (`ARCHITECTURE.md` §9 OPEN QUESTION) sigue sin resolver — no se
-   puede implementar sin tocar esos sistemas, prohibido hasta autorización explícita; ningún
-   paquete tiene todavía un `main`/CLI de producción real (hallazgo de la Fase 12, ver DEC-065/069)
-   — candidato a una fase futura dedicada; rama Linux/macOS del transporte IPC (DEC-010) sin
-   implementar; CI/CD (DEC-074) queda para la Fase 15.
-4. **Recordatorio de proceso, a raíz de lo señalado por el usuario en esta fase:** revisar
-   periódicamente que `README.md`/`README.en.md`/`CHANGELOG.md`/`CONTRIBUTING.md` no se queden
-   desactualizados — a diferencia de `STATE.md`/`ROADMAP.md`/`DECISIONS.md`, no forman parte del
-   ciclo de actualización automática de cada fase salvo que se revisen explícitamente.
+2. Las 15 fases previstas del ROADMAP están completas. Próxima fase propuesta: **Fase 16 — Stable
+   Release**, no iniciada ni autorizada.
+3. Decisiones pendientes que siguen abiertas, no bloqueantes: inconsistencia de idioma de la
+   Fase 0 (deliberadamente sin resolver); el transporte IPC real Core↔Secrets Broker (DEC-010)
+   sigue sin implementar (distinto del canal Execution↔Secrets Broker de DEC-070, ya implementado,
+   y del canal MCP↔Execution de DEC-047, ya implementado); el usuario de sistema dedicado en cada
+   host remoto (`ARCHITECTURE.md` §9 OPEN QUESTION) sigue sin resolver — no se puede implementar
+   sin tocar esos sistemas, prohibido hasta autorización explícita; ningún paquete tiene todavía un
+   `main`/CLI de producción real (hallazgo de la Fase 12, ver DEC-065/069) — candidato a una fase
+   futura dedicada; rama Linux/macOS del transporte IPC (DEC-010) sin implementar; cambio real de
+   visibilidad del repositorio en GitHub (DEC-076) pendiente de que el usuario lo aplique.
+4. **Recordatorio de proceso, vigente desde la Fase 14:** revisar periódicamente que
+   `README.md`/`README.en.md`/`CHANGELOG.md`/`CONTRIBUTING.md` no se queden desactualizados — a
+   diferencia de `STATE.md`/`ROADMAP.md`/`DECISIONS.md`, no forman parte del ciclo de actualización
+   automática de cada fase salvo que se revisen explícitamente.
 
 ## Cómo reprender este trabajo
 

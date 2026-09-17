@@ -1,9 +1,13 @@
 # AgentForge
 
-**Estado del proyecto: 13 fases completadas (investigación, gobernanza, arquitectura núcleo, Tool
-Registry, Tool Discovery, Policy Engine, Secrets Broker, ejecución remota SSH, integración MCP,
-Sessions, Audit Log, Connectors, Dashboard Web, y Hardening de seguridad). Implementación real en
-TypeScript/Node.js, con tests automatizados. Ver `STATE.md` para el detalle completo y actualizado.**
+**Estado del proyecto: release `0.1.0` — 15 fases completadas (investigación, gobernanza,
+arquitectura núcleo, Tool Registry, Tool Discovery, Policy Engine, Secrets Broker, ejecución
+remota SSH, integración MCP, Sessions, Audit Log, Connectors, Dashboard Web, Hardening de
+seguridad, Testing e integración, y Documentación/release). Implementación real en
+TypeScript/Node.js, con tests automatizados y CI. `0.1.0` es la primera release interna del
+estado actual del proyecto — no implica que AgentForge sea ya un producto de producción completo
+(sigue sin existir un `main`/CLI de producción real desplegable). Ver `STATE.md` para el detalle
+completo y actualizado.**
 
 [English version](README.en.md)
 
@@ -74,10 +78,13 @@ AgentForge llena específicamente estos huecos — no reimplementa lo que Claude
 | Secrets Broker, ejecución remota SSH, integración MCP | **Completadas e implementadas** (Fases 6–8) |
 | Sessions, Audit Log, Connectors, Dashboard Web | **Completadas e implementadas** (Fases 9–12) |
 | Hardening de seguridad | **Completada** (Fase 13) |
-| Testing e integración | En curso (Fase 14) |
+| Testing e integración | **Completada** (Fase 14) |
+| Documentación y release | **Completada** (Fase 15) — release `0.1.0` |
 | Implementación de software | **Sí — 8 paquetes TypeScript/Node.js reales, con tests automatizados** |
 | Repositorio Git | Inicializado, con historial completo de fases |
-| Repositorio remoto | `https://github.com/catlinux/AgentForge` (activo, sincronizado) |
+| Repositorio remoto | `https://github.com/catlinux/AgentForge` — visibilidad decidida como Público (DEC-076), cambio real pendiente de aplicar por el usuario |
+| CI/CD | GitHub Actions, matriz Linux/Windows (DEC-078) |
+| Licencia | MIT (ver `LICENSE`) |
 
 Ver `STATE.md` para el estado detallado y actualizado del proyecto en todo momento — es la única
 fuente de verdad sobre el progreso real; este README se actualiza en cada fase pero puede quedar
@@ -104,8 +111,8 @@ autorización explícita separada; toda verificación se hace contra mocks/fixtu
 Cada componente corre como proceso separado, comunicado por canales IPC propios (named pipe en
 Windows, Unix domain socket en Linux/macOS), con fail-closed uniforme ante cualquier ambigüedad.
 El detalle completo de cada decisión está en `architecture/ARCHITECTURE.md` (y su equivalente
-`architecture/ARCHITECTURE.en.md`) y en `decisions/DECISIONS.md` — más de 70 decisiones aprobadas
-a lo largo de 13 fases. El documento original de la Fase 0, `architecture/ARCHITECTURE-DRAFT.md`,
+`architecture/ARCHITECTURE.en.md`) y en `decisions/DECISIONS.md` — más de 80 decisiones aprobadas
+a lo largo de 15 fases. El documento original de la Fase 0, `architecture/ARCHITECTURE-DRAFT.md`,
 se conserva como referencia histórica.
 
 ## Principios principales
@@ -143,12 +150,12 @@ en particular. Ver `docs/es/research/RELATED-PROJECTS.md`.
 
 ## Próximos pasos
 
-**Fase 14 — Testing e integración** está en curso: tests de integración real entre procesos
-(MCP-server↔Execution↔Secrets Broker, con SSH y HTTP simulados localmente, nunca contra sistemas
-remotos reales), cobertura de código informativa. Ver `ROADMAP.md` para la planificación completa.
+Las 15 fases previstas para esta etapa del proyecto están completas. El ROADMAP contempla fase
+16 (Stable Release) como siguiente paso propuesto, todavía no iniciado ni autorizado. Ver
+`ROADMAP.md` para la planificación completa.
 
-Decisiones menores todavía pendientes: licencia del proyecto, visibilidad del repositorio,
-inconsistencia de idioma de la Fase 0, CI/CD (previsto para la Fase 15). Ver
+Decisión menor todavía pendiente: inconsistencia de idioma de la Fase 0 (investigación en catalán
+frente al resto del proyecto en español/inglés) — mantenida deliberadamente sin resolver, ver
 `decisions/DECISIONS.md`, sección "PENDIENTE".
 
 ## Cómo está organizado el proyecto
@@ -157,6 +164,8 @@ inconsistencia de idioma de la Fase 0, CI/CD (previsto para la Fase 15). Ver
 AgentForge/
 ├── .claude/
 │   └── CLAUDE.md              — manual operativo para Claude Code
+├── .github/
+│   └── workflows/ci.yml        — CI (GitHub Actions, matriz Linux/Windows)
 ├── docs/
 │   └── research/               — investigación Fase 0 (catalán): Composio, MCP, Claude Code, fuentes
 ├── research/
@@ -164,9 +173,11 @@ AgentForge/
 ├── architecture/
 │   ├── ARCHITECTURE.md         — arquitectura completa (español, principal)
 │   ├── ARCHITECTURE.en.md      — arquitectura completa (inglés)
+│   ├── TECH-STACK-ANALYSIS.md/.en.md      — análisis de stack tecnológico
+│   ├── CORE-STRUCTURE-ANALYSIS.md/.en.md  — análisis de estructura núcleo
 │   └── ARCHITECTURE-DRAFT.md   — propuesta original de la Fase 0 (catalán, histórico)
 ├── decisions/
-│   └── DECISIONS.md            — más de 70 decisiones aprobadas a lo largo de 13 fases
+│   └── DECISIONS.md            — más de 80 decisiones aprobadas a lo largo de 15 fases
 ├── packages/
 │   ├── shared/                 — tipos, contratos, Audit Log, utilidades compartidas
 │   ├── core/                   — Tool Registry, Tool Discovery, Policy Engine
@@ -177,6 +188,7 @@ AgentForge/
 │   └── dashboard/              — interfaz web de solo lectura
 ├── tests/
 │   └── integration/            — tests de integración real entre procesos (Fase 14)
+├── LICENSE                     — MIT
 ├── STATE.md                    — estado actual del proyecto (fuente de verdad)
 ├── README.md / README.en.md    — este documento
 ├── CHANGELOG.md
@@ -188,6 +200,4 @@ AgentForge/
 
 ## Licencia
 
-**Pendiente de decisión.** El proyecto todavía no tiene una licencia asignada. No se debe asumir
-ninguna licencia hasta que el usuario la decida explícitamente. Ver `DEVELOPMENT.md` y
-`decisions/DECISIONS.md` para el seguimiento de esta decisión pendiente.
+**MIT** (DEC-075, Fase 15). Ver `LICENSE` en la raíz del repositorio.

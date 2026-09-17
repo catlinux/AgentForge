@@ -25,7 +25,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 12 | Dashboard Web | **Completada** — 6 decisiones aprobadas (DEC-064 a DEC-069) |
 | 13 | Hardening de seguridad | **Completada** — 2 decisiones aprobadas (DEC-070, DEC-071) |
 | 14 | Testing e integración | **Completada** — 3 decisiones aprobadas (DEC-072 a DEC-074) |
-| 15 | Documentación y release | Propuesta, no iniciada |
+| 15 | Documentación y release | **Completada** — 5 decisiones aprobadas (DEC-075 a DEC-079), release `0.1.0` |
 | 16 | Stable Release | Propuesta, no iniciada |
 
 ## Fase 0 — Investigación técnica (completada)
@@ -173,7 +173,15 @@ de ellas.
   explícitamente a la Fase 15. 2 tests de integración nuevos (4 casos: flujo completo real +
   fail-closed sin Secrets Broker disponible, para cada uno de los dos Execution Backends
   existentes).
-- **Fase 15 — Documentación y release**: preparación de release pública/interna.
+- **Fase 15 — Documentación y release**: preparación de release pública/interna. 5 decisiones
+  aprobadas (DEC-075 a DEC-079, ver `decisions/DECISIONS.md`): licencia MIT; visibilidad del
+  repositorio decidida como Público (cambio real en GitHub pendiente de que el usuario lo aplique
+  cuando lo considere oportuno); versionado SemVer desde `0.1.0` como primera release interna del
+  estado actual del proyecto (no una afirmación de producto de producción completo); CI/CD en
+  GitHub Actions con matriz Linux/Windows (`typecheck`/`lint`/`format`/`test`/`build`/
+  `test:integration` en cada push/PR a `master`); traducción al inglés de
+  `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`. `CHANGELOG.md` gana una primera
+  entrada versionada `[0.1.0]`, reemplazando la sección `[Unreleased]` ya cerrada.
 - **Fase 16 — Stable Release**: primera versión estable.
 
 ## Decisiones pendientes que condicionan este roadmap

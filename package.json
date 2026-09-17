@@ -1,7 +1,7 @@
 {
   "name": "agentforge",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "AgentForge monorepo root — see STATE.md and architecture/CORE-STRUCTURE-ANALYSIS.md",
   "packageManager": "pnpm@9.15.0",

@@ -253,6 +253,33 @@ y revisión/DEC-036 — ver `decisions/DECISIONS.md`.
 - **`SECURITY.md` actualizado**: refleja el estado real de implementación por primera vez desde su
   creación en Fase 0.5 — ya no describe únicamente principios sin código detrás.
 
+**DECIDIDO (DEC-072 a DEC-074, Fase 14, 2026-09-17):** tests de integración real entre procesos,
+cobertura de código, CI/CD pospuesto — ver `decisions/DECISIONS.md`.
+
+- **Tests de integración:** directorio separado `tests/integration/`, workspace pnpm propio,
+  script `pnpm run test:integration` distinto del `pnpm run test` rápido de siempre (DEC-072).
+  Arrancan procesos reales del sistema operativo (Secrets Broker, execution-ssh,
+  connector-github) contra un servidor SSH/HTTP simulado en loopback, nunca sistemas remotos
+  reales.
+- **Cobertura de código:** `@vitest/coverage-v8` vía `pnpm run test:coverage`, informativa, sin
+  umbral bloqueante (DEC-073).
+- **CI/CD:** pospuesto explícitamente a la Fase 15 (DEC-074).
+
+**DECIDIDO (DEC-075 a DEC-079, Fase 15, 2026-09-17):** licencia, visibilidad del repositorio,
+versionado, CI/CD, y traducción de documentos de arquitectura — ver `decisions/DECISIONS.md`.
+
+- **Licencia:** MIT (DEC-075). Ver `LICENSE`.
+- **Visibilidad del repositorio:** Público (DEC-076) — decisión documentada; el cambio real de
+  visibilidad en GitHub queda pendiente de que el propio usuario lo aplique cuando lo considere
+  oportuno, no se ejecutó en esta fase.
+- **Versionado:** SemVer desde `0.1.0` (DEC-077) — primera release interna del estado actual del
+  proyecto, no una afirmación de que sea ya un producto de producción completo.
+- **CI/CD:** `.github/workflows/ci.yml`, matriz Linux/Windows, corre
+  `typecheck`/`lint`/`format`/`test`/`build`/`test:integration` en cada push/PR a `master`
+  (DEC-078).
+- **Traducción:** `architecture/TECH-STACK-ANALYSIS.en.md` y
+  `architecture/CORE-STRUCTURE-ANALYSIS.en.md` añadidos (DEC-079).
+
 ## Cómo ejecutar el proyecto
 
 No existe todavía ningún `main`/CLI de producción real que arranque los procesos (`mcp-server`,
@@ -284,20 +311,24 @@ Ver `README.md`, sección "Cómo está organizado el proyecto", para la estructu
   — la identidad Git global de esta máquina (`warcrafted-server <warcrafted.server@gmail.com>`)
   nunca se ha modificado.
 - Remoto: `https://github.com/catlinux/AgentForge` (DEC-001), accedido vía SSH. Visibilidad
-  (público/privado) todavía no confirmada explícitamente por el usuario — no asumida.
+  decidida como **Público** (DEC-076, Fase 15) — el cambio real en la configuración de GitHub
+  queda pendiente de que el usuario lo aplique cuando lo considere oportuno, no ejecutado por
+  este agente en ninguna fase.
 - Cada commit y cada push requieren autorización explícita y separada del usuario (ver
   `.claude/CLAUDE.md`) — nunca se ejecutan automáticamente al cerrar una fase.
+- CI (`.github/workflows/ci.yml`, DEC-078): se activa automáticamente en cada push/PR a `master`
+  una vez el commit correspondiente se haya pusheado — no requiere autorización adicional más
+  allá de la ya concedida para ese push, ya que no realiza ninguna acción distinta de ejecutar los
+  mismos comandos que ya se ejecutan localmente en cada VERIFY.
 
 ## Licencia
 
-**PENDIENTE DE DECISIÓN.** No se ha elegido todavía una licencia para el código de AgentForge. No
-debe asumirse ninguna licencia por defecto, pese a que el código ya es real y sustancial (8
-paquetes, 13 fases).
+**MIT** (DEC-075, Fase 15). Ver `LICENSE` en la raíz del repositorio.
 
 Distinción importante (ver `docs/research/COMPOSIO-ANALYSIS.md` y `docs/research/MCP-ANALYSIS.md`
 para el detalle completo de licencias de terceros investigadas):
 
-- **Licencia de AgentForge (código propio):** pendiente de decisión del usuario.
+- **Licencia de AgentForge (código propio):** MIT.
 - **Licencias de proyectos analizados como referencia:**
   - Composio (SDK cliente): MIT, titular "Sampark Inc." — con una inconsistencia menor entre
     `LICENSE` (MIT) y `CONTRIBUTING.md` (ISC), marcada como `LEGAL REVIEW REQUIRED` de riesgo bajo
@@ -307,8 +338,8 @@ para el detalle completo de licencias de terceros investigadas):
   - Servidores de referencia MCP (`modelcontextprotocol/servers`): dual-licenciados Apache 2.0
     (código nuevo) / MIT (código existente).
 - **Licencias de dependencias reales de producción:** `@modelcontextprotocol/sdk` (MIT/Apache 2.0
-  según paquete), `ssh2` (MIT), `fastify` (MIT) — ninguna con licencia copyleft fuerte que
-  condicione la licencia final de AgentForge; revisar de nuevo cuando se decida la licencia propia.
+  según paquete), `ssh2` (MIT), `fastify` (MIT) — todas compatibles con MIT, ninguna con licencia
+  copyleft fuerte.
 - **Puntos que requieren revisión legal:** la inconsistencia MIT/ISC de Composio (riesgo bajo,
   documentada, no bloqueante). Ningún otro punto de riesgo legal detectado.
 

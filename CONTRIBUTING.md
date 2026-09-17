@@ -1,20 +1,22 @@
 # Contribuir a AgentForge
 
 AgentForge es, por ahora, un proyecto personal con implementación real (8 paquetes TypeScript/
-Node.js, 13 fases completadas) pero sin un proceso de contribución externo activo — el
-repositorio existe en GitHub pero no acepta colaboradores externos todavía. Este documento
-establece las convenciones que regirán las contribuciones si el proyecto se abre en el futuro, y
-las que ya aplican hoy al trabajo interno (con o sin asistencia de Claude Code).
+Node.js, 15 fases completadas, release `0.1.0`) pero sin un proceso de contribución externo activo
+todavía — el repositorio es público en GitHub (DEC-076), pero eso no implica que acepte
+colaboradores externos. Este documento establece las convenciones que regirán las contribuciones
+si el proyecto abre esa puerta en el futuro, y las que ya aplican hoy al trabajo interno (con o
+sin asistencia de Claude Code).
 
 ## Estado actual
 
 - Hay código de producción real desde la Fase 2 en adelante (ver `STATE.md` y `packages/`).
-- El repositorio es `https://github.com/catlinux/AgentForge`; no se ha decidido si aceptará
-  contribuciones externas ni se ha confirmado explícitamente su visibilidad pública/privada.
-- No se ha decidido licencia (ver `DEVELOPMENT.md`).
+- El repositorio es `https://github.com/catlinux/AgentForge`, con visibilidad decidida como
+  Público (DEC-076) — no se ha decidido si aceptará contribuciones externas ni Pull Requests de
+  terceros; ser público no implica lo uno ni lo otro.
+- Licencia: MIT (DEC-075). Ver `LICENSE`.
 
-Hasta que estos puntos se decidan, este documento describe las convenciones de trabajo internas,
-no un proceso de contribución abierto.
+Hasta que se decida abrir el proyecto a contribuciones externas, este documento describe las
+convenciones de trabajo internas, no un proceso de contribución abierto.
 
 ## Flujo de trabajo
 

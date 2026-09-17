@@ -1622,6 +1622,93 @@ Format per a cada decisió futura:
 
 ---
 
+## DEC-075 — Licencia del proyecto: MIT (Fase 15)
+
+- Fecha: 2026-09-17
+- Contexto: la licencia de AgentForge llevaba pendiente de decisión desde la Fase 0.5, marcada
+  explícitamente como bloqueante para cualquier release (`DEVELOPMENT.md`, `decisions/DECISIONS.md`
+  sección PENDIENTE).
+- Opciones consideradas: MIT, Apache 2.0, sin licencia/propietaria, o posponer la decisión.
+- Decisión: **MIT**. Coherente con buena parte del ecosistema de dependencias que ya usa el
+  proyecto (SDK MCP oficial, `ssh2`, `fastify` son MIT o incluyen MIT entre sus licencias).
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: fichero `LICENSE` (texto MIT estándar, titular a determinar con el usuario en el
+  propio fichero) añadido en la raíz del repositorio. `DEVELOPMENT.md`/`README.md`/`README.en.md`
+  actualizados para dejar de marcar la licencia como pendiente.
+
+## DEC-076 — Visibilidad del repositorio: Público (Fase 15)
+
+- Fecha: 2026-09-17
+- Contexto: la visibilidad de `catlinux/AgentForge` en GitHub llevaba sin confirmarse
+  explícitamente desde la Fase 0.5 (DEC-001 solo confirmó el uso de GitHub, no la visibilidad).
+  Durante esta fase el usuario cambió de opinión dos veces (Privado → Público) en mensajes
+  sucesivos; se verificó explícitamente cuál era la decisión final antes de proceder, dada la
+  contradicción aparente entre "lo dejo público" y una aprobación de PLAN posterior que decía
+  "permanece privado".
+- Opciones consideradas: Público, Privado, o sin cambios/decidir más tarde.
+- Decisión: **Público** (confirmado explícitamente tras aclarar la contradicción).
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, confirmado dos veces tras detectarse
+  una contradicción entre mensajes).
+- Consecuencias: **decisión documentada aquí, pero NO ejecutada como cambio real de visibilidad en
+  GitHub en esta fase** — el usuario indicó explícitamente "de momento lo dejo público" sin pedir
+  que se aplicara el cambio real vía `gh`/API; el propio usuario confirmará/ajustará la visibilidad
+  real en la configuración del repositorio cuando lo considere oportuno. Ningún workflow de CI
+  (DEC-078) ni ninguna otra pieza de esta fase asume ni depende de que el cambio real ya se haya
+  aplicado.
+
+## DEC-077 — Primera release interna: versionado SemVer desde 0.1.0 (Fase 15)
+
+- Fecha: 2026-09-17
+- Contexto: los 8 `package.json` del monorepo llevaban en `0.0.0` desde su creación, sin ningún
+  esquema de versionado real ni tag de Git.
+- Opciones consideradas: (A) adoptar SemVer ahora, marcando el estado actual como `0.1.0`; (B)
+  mantener `0.0.0` indefinidamente hasta que exista un `main`/CLI de producción real desplegable.
+- Decisión: **(A)**. El usuario precisó explícitamente que `0.1.0` debe entenderse como **primera
+  release interna del estado actual del proyecto** (14 fases de desarrollo, 8 paquetes reales con
+  tests), **no como una afirmación de que AgentForge sea ya un producto de producción completo** —
+  la ausencia de un `main`/CLI de producción real (hallazgo de Fase 12) sigue siendo una limitación
+  documentada, no oculta por el número de versión.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, con precisión explícita sobre el
+  significado de `0.1.0`).
+- Consecuencias: los 8 `package.json` pasan a `"version": "0.1.0"`; `CHANGELOG.md` gana una entrada
+  `[0.1.0] - 2026-09-17` reemplazando la sección `[Unreleased]` ya cerrada; un tag de Git `v0.1.0`
+  se crea solo con autorización explícita y separada (igual que cualquier commit/push).
+
+## DEC-078 — CI/CD: workflow de GitHub Actions para Linux y Windows (Fase 15)
+
+- Fecha: 2026-09-17
+- Contexto: pospuesto explícitamente desde la Fase 14 (DEC-074) para esta fase.
+- Opciones consideradas: (A) workflow mínimo en una sola plataforma (Linux, la más común/barata en
+  GitHub Actions); (B) matriz de plataformas incluyendo Windows, dado que el desarrollo real del
+  proyecto ocurre en Windows y ya existen 2 tests omitidos explícitamente por diferencias de
+  plataforma (permisos POSIX, `packages/secrets-broker/src/storage/master-key.test.ts`).
+- Decisión: **(B)**, explícitamente solicitado por el usuario ("que sea correcto para las
+  compilaciones de linux i windows"). Corre `typecheck`/`lint`/`format`/`test`/`build` en una
+  matriz `[ubuntu-latest, windows-latest]` en cada push/PR a `master`.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa). El usuario indicó explícitamente que
+  no hace falta notificarle la verificación real de la ejecución en GitHub Actions tras el
+  push — la revisará él mismo.
+- Consecuencias: `.github/workflows/ci.yml` nuevo. Verificado localmente que el YAML es
+  sintácticamente válido y que los comandos que invoca (`pnpm run typecheck`/`lint`/`format`/
+  `test`/`build`) ya se ejecutan limpios en este VERIFY — la ejecución real en GitHub Actions
+  ocurrirá tras el push, sin verificación ni reporte adicional de este agente salvo que el usuario
+  lo pida.
+
+## DEC-079 — Traducción al inglés de TECH-STACK-ANALYSIS.md y CORE-STRUCTURE-ANALYSIS.md (Fase 15)
+
+- Fecha: 2026-09-17
+- Contexto: pospuesta explícitamente en la Fase 2 (2026-09-16) "hasta que la documentación esté
+  más estable". Con 14 fases completadas sin cambios estructurales sobre estos dos documentos, se
+  planteó al usuario si esa condición ya se cumple.
+- Opciones consideradas: traducir ahora, o seguir posponiendo.
+- Decisión: **traducir ahora**. La documentación de arquitectura lleva 14 fases estable.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: `architecture/TECH-STACK-ANALYSIS.en.md` y
+  `architecture/CORE-STRUCTURE-ANALYSIS.en.md` nuevos, contenido equivalente (no traducción
+  automática palabra por palabra, mismo criterio ya aplicado a `README.en.md`/`ARCHITECTURE.en.md`).
+
+---
+
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
 
 Estas no son decisiones — son la lista de puntos que necesitan decisión antes o durante la Fase 1.
@@ -1697,15 +1784,16 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):
 
-1. **Licencia del proyecto** — todavía no elegida. Ver `DEVELOPMENT.md`.
+1. ~~Licencia del proyecto~~ → **resuelto, ver DEC-075 (Fase 15): MIT**.
 2. **Inconsistencia de idioma entre fases** — la documentación de la Fase 0 está en catalán; desde
    la Fase 0.5 el proyecto usa español/inglés. Pendiente decidir si en algún momento se traduce la
-   investigación de la Fase 0, o si se mantiene como está permanentemente (ver `README.md`).
-3. **Visibilidad del repositorio** `catlinux/AgentForge` (público/privado) — no confirmada
-   explícitamente por el usuario, no asumida.
-4. **Traducción al inglés de `architecture/TECH-STACK-ANALYSIS.md`** y
-   **`architecture/CORE-STRUCTURE-ANALYSIS.md`** — pospuesta a propósito hasta que la
-   documentación esté más estable (decisión del usuario, 2026-09-16).
+   investigación de la Fase 0, o si se mantiene como está permanentemente (ver `README.md`). Sigue
+   genuinamente pendiente — no se ha decidido traducir la Fase 0 en la Fase 15.
+3. ~~Visibilidad del repositorio~~ → **resuelto, ver DEC-076 (Fase 15): Público** (decisión
+   documentada; cambio real en GitHub no ejecutado en esta fase, a confirmar/aplicar por el
+   usuario cuando lo considere oportuno).
+4. ~~Traducción al inglés de `architecture/TECH-STACK-ANALYSIS.md` y
+   `architecture/CORE-STRUCTURE-ANALYSIS.md`~~ → **resuelto, ver DEC-079 (Fase 15)**.
 5. Preguntas de detalle de implementación de la Fase 2 todavía no cubiertas por DEC-008 a DEC-012
    (framework HTTP concreto, formato del Tool Registry, paquete de acceso a Windows Credential
    Manager, empaquetado exacto del Secrets Broker, etc.), listadas en

@@ -5,7 +5,8 @@
 > se conserva íntegro como registro del análisis que la fundamenta.
 
 Complementa `architecture/ARCHITECTURE.md` §17, que dejó el stack tecnológico como la pregunta
-abierta más importante de la Fase 1.
+abierta más importante de la Fase 1. Traducción al inglés disponible en
+`architecture/TECH-STACK-ANALYSIS.en.md` (DEC-079, Fase 15).
 
 **Fecha:** 2026-09-16.
 
