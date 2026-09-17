@@ -1385,6 +1385,126 @@ Format per a cada decisió futura:
 
 ---
 
+## DEC-064 — Dashboard: acceso a datos vía lectura directa de ficheros (Fase 12)
+
+- Fecha: 2026-09-17
+- Contexto: el Dashboard (Fase 12, solo lectura) necesita consumir Tool Registry/Discovery, Policy
+  Engine y Audit Log sin convertirse en un segundo camino de acceso que evite Policy Engine/Secrets
+  Broker (restricción ya fijada en `architecture/ARCHITECTURE.md` §15).
+- Opciones consideradas: (A) el Dashboard lee directamente los ficheros JSON/JSON Lines ya
+  existentes (configuración declarativa de Registry/Discovery/Policy, Audit Log) desde su propio
+  proceso; (B) el Dashboard llama a una API HTTP nueva expuesta por `core`/`mcp-server`, reabriendo
+  §14 ("API externa", explícitamente no propuesta para la fase 1).
+- Decisión: **(A)**. Es la opción más simple, no reabre §14, y es coherente con §15: consume las
+  mismas fuentes de verdad que ya consumen Core/MCP server, sin inventar un canal de autorización
+  nuevo (no hay autorización que dar porque es solo lectura de ficheros ya en disco, nunca
+  secretos).
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, aprobación agrupada del PLAN completo).
+- Consecuencias: `packages/dashboard` no depende en tiempo de ejecución de `core` ni de
+  `mcp-server` como procesos — solo lee sus ficheros de configuración/estado. Si en el futuro se
+  necesita una API externa real, esta decisión debería revisarse (no automáticamente heredable).
+
+## DEC-065 — Dashboard: bootstrap mínimo de `AuditWriter` con ruta real (Fase 12)
+
+- Fecha: 2026-09-17
+- Contexto: verificado durante INSPECT que `AuditWriter` (Fase 10, DEC-052/053/057) se recibe como
+  parámetro opcional en `tools-call.ts`, `server.ts`, `execution-server.ts`, `connector-server.ts`,
+  pero ningún punto de arranque real lo instancia con una ruta de fichero — solo se construye en su
+  propio test unitario. Sin esto, el Dashboard no tendría ningún dato real de Audit Log que leer.
+- **Precisión adicional durante EXECUTE:** verificado que `startStdioServer`/`startExecutionServer`/
+  `startConnectorServer` son funciones de librería con dependencias completamente inyectadas —
+  ningún paquete tiene hoy un `main`/CLI/`bin` real que las invoque como proceso. No existen "3
+  puntos de arranque ya existentes" como procesos reales, solo como funciones.
+- Opciones consideradas: (A) dejar el bootstrap fuera de alcance, verificando el Dashboard solo
+  contra fixtures de prueba; (B) resolver un bootstrap mínimo: función de resolución de ruta fija
+  en `packages/shared`, usada para construir el `AuditWriter` real en los 3 puntos de arranque ya
+  existentes; (B revisada, tras la precisión anterior) cada start-function (`startStdioServer`,
+  `startExecutionServer`, `startConnectorServer`) construye internamente un `AuditWriter` por
+  defecto vía `resolveAuditLogPath(...)` cuando el llamador no inyecta uno explícitamente — sin
+  crear ningún `main`/CLI/proceso nuevo, que ampliaría el alcance de esta fase más allá de lo
+  aprobado en el PLAN.
+- Decisión: **(B revisada)**, acotado estrictamente a que cada start-function tenga un valor por
+  defecto no vacío para su `auditWriter` — sin tocar la lógica de auditoría (DEC-052 a DEC-057),
+  sin introducir un proceso, CLI o orquestación de despliegue nuevos.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa; precisión de alcance confirmada
+  explícitamente durante EXECUTE antes de implementar).
+- Consecuencias: `packages/shared` gana una función de resolución de ruta de Audit Log (por
+  proceso). El día que exista un `main`/CLI real para `mcp-server`/`execution-ssh`/
+  `connector-github` (fase futura, no esta), escribirá auditoría real en disco por defecto sin
+  cambios adicionales. Hasta entonces, sigue sin haber ninguna ejecución de proceso real que
+  produzca ficheros de auditoría reales — el Dashboard de esta fase se verifica contra fixtures
+  generadas a mano, documentado explícitamente como limitación de esta fase. No se crea ningún
+  mecanismo de rotación/purga nuevo.
+
+## DEC-066 — Dashboard: framework HTTP Fastify (Fase 12)
+
+- Fecha: 2026-09-17
+- Contexto: `DEVELOPMENT.md` dejaba pendiente explícitamente el framework HTTP concreto desde la
+  Fase 1/2.
+- Opciones consideradas: (A) Fastify; (B) Express; (C) `node:http` puro sin framework.
+- Decisión: **(A) Fastify**. TypeScript-first, sin binarios nativos que compilar (coherente con el
+  criterio ya aplicado en DEC-053/DEC-063 de evitar dependencias con riesgo de compilación nativa,
+  ya materializado con `ssh2`/`cpu-features` en Fase 7), más productivo que `node:http` puro para
+  las pocas rutas GET necesarias.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, aprobación agrupada del PLAN completo).
+- Consecuencias: primera dependencia de framework HTTP del proyecto, aislada en
+  `packages/dashboard` — no se propaga a ningún otro paquete.
+
+## DEC-067 — Dashboard: frontend HTML servido + JS mínimo sin framework de build (Fase 12)
+
+- Fecha: 2026-09-17
+- Contexto: el Dashboard es solo lectura, sin formularios complejos ni edición.
+- Opciones consideradas: (A) SPA completa (React/Vue) con su propio toolchain de build
+  (Vite/webpack); (B) HTML servido por el propio servidor Fastify + JavaScript mínimo sin
+  framework, consumiendo los endpoints vía `fetch`.
+- Decisión: **(B)**. Evita introducir un segundo toolchain de build y sus dependencias en un
+  proyecto que hasta ahora tiene cero dependencias de frontend, para un caso de uso que no lo
+  justifica (sin formularios, sin estado complejo de UI).
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, aprobación agrupada del PLAN completo).
+- Consecuencias: si en una fase futura el Dashboard gana edición/interactividad compleja, esta
+  decisión debería revisarse explícitamente — no es una limitación permanente, solo el alcance
+  mínimo de esta fase.
+
+## DEC-068 — Dashboard: sin autenticación, bind exclusivo a localhost (Fase 12)
+
+- Fecha: 2026-09-17
+- Contexto: coherente con DEC-048 (Sessions, alcance single-user/single-agent) y con que el
+  Dashboard corre local en esta fase, sin exposición a red.
+- Opciones consideradas: (A) sin autenticación, bind exclusivo a `127.0.0.1`; (B) token estático en
+  fichero de configuración; (C) integración con Secrets Broker para autenticar el acceso al propio
+  Dashboard.
+- Decisión: **(A)**, documentado explícitamente como limitación de esta fase — el Dashboard nunca
+  debe exponerse en una interfaz de red distinta de loopback sin revisar esta decisión primero.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, aprobación agrupada del PLAN completo).
+- Consecuencias: si en el futuro se necesita acceso remoto al Dashboard (p. ej. desde otra máquina
+  de la red doméstica), esta decisión debe revisarse explícitamente antes de cambiar el bind.
+
+## DEC-069 — Dashboard: convención de ruta real para configuración de Registry/Discovery/Policy (Fase 12)
+
+- Fecha: 2026-09-17
+- Contexto: verificado durante EXECUTE que, igual que `AuditWriter` antes de DEC-065,
+  `loadDiscoveryConfig`, `loadPolicyConfig` y `FileToolRegistryStore` (Fases 3-5) tampoco tienen
+  ninguna ruta real convencional en ningún punto del código — solo se invocan con rutas de test.
+  El Dashboard necesita leer estos 3 ficheros para mostrar Tool Registry/Discovery/Policy Engine.
+- Opciones consideradas: (A) extender la misma convención `AGENTFORGE_DATA_DIR` ya introducida por
+  DEC-065 con 3 funciones de resolución de ruta análogas en `packages/shared` (solo usadas por el
+  Dashboard para leer); (B) el Dashboard define su propia configuración de rutas, sin asumir
+  convención compartida con el resto de paquetes; (C) reducir el alcance del Dashboard de esta fase
+  a solo Audit Log, posponiendo Registry/Discovery/Policy a una fase futura.
+- Decisión: **(A)**. Mantiene una única convención de "dónde vive el estado real de AgentForge en
+  disco" en vez de dos esquemas distintos, y es coherente con el alcance ya aprobado del Dashboard
+  (mostrar Registry/Discovery/Policy, no solo Audit Log). Estas funciones son de solo lectura desde
+  el punto de vista del Dashboard — no implica que Registry/Discovery/Policy Engine adopten ellas
+  mismas esta convención como parte de su propia lógica (eso seguiría sin decidirse, y solo
+  importaría el día que exista un `main`/CLI real para `core`).
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: `packages/shared` gana `resolveRegistryCachePath`, `resolveDiscoveryConfigPath`,
+  `resolvePolicyConfigPath` (mismo patrón que `resolveAuditLogPath`, DEC-065). No se modifica
+  `FileToolRegistryStore`/`loadDiscoveryConfig`/`loadPolicyConfig` en sí — siguen recibiendo una
+  ruta como parámetro, ahora resuelta por el Dashboard con estas funciones en vez de hardcodeada.
+
+---
+
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
 
 Estas no son decisiones — son la lista de puntos que necesitan decisión antes o durante la Fase 1.

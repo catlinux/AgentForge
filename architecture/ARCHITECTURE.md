@@ -575,19 +575,27 @@ de datos en esta fase, JSON Lines append-only.**
 
 ## 15. Dashboard / Web UI (a nivel arquitectónico)
 
-**PROPOSAL:**
+**DECISION (DEC-064 a DEC-069, Fase 12):** paquete propio `packages/dashboard`, de **solo
+lectura** — sin ejecución, sin gestión de secretos, sin edición de configuración en esta fase.
 
-- El roadmap (`ROADMAP.md`) ya contempla una Fase 12 — Dashboard Web separada. Este documento no
-  diseña el dashboard en detalle, pero deja constancia de una restricción arquitectónica: **si en
-  el futuro se construye un dashboard, debe consumir los mismos componentes que Claude Code
-  consume** (Tool Registry, Audit Log, Policy Engine) a través de una interfaz bien definida — no
-  debe convertirse en un segundo camino de acceso a las credenciales o a la ejecución que evite el
-  Policy Engine o el Secrets Broker.
-- La investigación de Fase 0.7 no identificó ningún patrón técnico de dashboard suficientemente
-  diferenciado como para destacarlo en esta fase (`docs/es/research/RELATED-PROJECTS.md`, sección
-  "Dashboard") — se deja explícitamente como trabajo de una fase futura.
+- Respeta la restricción arquitectónica ya prevista antes de esta fase: consume las mismas fuentes
+  de verdad que ya consumen Core/MCP server (caché de Tool Registry, configuración de Discovery y
+  de Policy Engine, Audit Log JSON Lines) por **lectura directa de fichero**, nunca por un segundo
+  camino de acceso a credenciales o ejecución que evite el Policy Engine o el Secrets Broker
+  (DEC-064).
+- Framework HTTP: Fastify (DEC-066). Frontend: HTML servido + JavaScript mínimo, sin toolchain de
+  build (DEC-067). Sin autenticación, bind exclusivo a `127.0.0.1` (DEC-068).
+- **Hallazgo verificado durante esta fase:** ningún paquete tenía un `main`/CLI real que
+  instanciara `AuditWriter` (Fase 10) con una ruta de fichero real, ni una convención de ruta real
+  para la configuración de Registry/Discovery/Policy — solo se usaban rutas de test. Resuelto con
+  el mínimo cambio posible: cada `start*Server` construye un `AuditWriter` por defecto si no se le
+  inyecta uno (DEC-065), y una convención de rutas `AGENTFORGE_DATA_DIR` en `packages/shared`
+  cubre también Registry/Discovery/Policy para el uso de lectura del Dashboard (DEC-069). Ningún
+  paquete tiene todavía un `main`/CLI de producción real — sigue siendo trabajo de una fase futura.
 
-**OPEN QUESTION:** ninguna para la fase 1 — este componente está deliberadamente fuera de alcance.
+**OPEN QUESTION:** ninguna bloqueante — un `main`/CLI real de producción para
+`mcp-server`/`execution-ssh`/`connector-github` sigue sin existir, documentado como limitación
+heredada, no de esta fase.
 
 ---
 

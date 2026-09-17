@@ -22,7 +22,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 9 | Sessions | **En curso** — 4 decisiones aprobadas (DEC-048 a DEC-051) |
 | 10 | Audit Log | **Completada** — 6 decisiones aprobadas (DEC-052 a DEC-057) |
 | 11 | Connectors | **Completada** — 6 decisiones aprobadas (DEC-058 a DEC-063) |
-| 12 | Dashboard Web | Propuesta, no iniciada |
+| 12 | Dashboard Web | **Completada** — 6 decisiones aprobadas (DEC-064 a DEC-069) |
 | 13 | Hardening de seguridad | Propuesta, no iniciada |
 | 14 | Testing e integración | Propuesta, no iniciada |
 | 15 | Documentación y release | Propuesta, no iniciada |
@@ -139,7 +139,17 @@ de ellas.
   Limitación conocida y heredada de `execution-ssh`: ningún backend tiene hoy un canal real hacia
   el Secrets Broker en producción (DEC-010 sin implementación real) — fuera de alcance de esta
   fase, candidata a Fase 13 o una fase dedicada.
-- **Fase 12 — Dashboard Web**: interfaz de administración/visualización.
+- **Fase 12 — Dashboard Web**: interfaz de solo lectura sobre Tool Registry/Discovery, Policy
+  Engine y Audit Log. 6 decisiones aprobadas (DEC-064 a DEC-069, ver `decisions/DECISIONS.md`):
+  acceso a datos por lectura directa de los mismos ficheros que ya consume Core (sin API externa
+  nueva, sin reabrir §14); bootstrap mínimo para que `startStdioServer`/`startExecutionServer`/
+  `startConnectorServer` construyan un `AuditWriter` real por defecto cuando no se les inyecta uno
+  (cierra un hueco heredado de la Fase 10: nunca se instanciaba con una ruta real); Fastify como
+  framework HTTP (sin dependencias con compilación nativa); frontend HTML servido + JavaScript
+  mínimo sin toolchain de build; sin autenticación, bind exclusivo a `127.0.0.1`; convención
+  `AGENTFORGE_DATA_DIR` extendida a las rutas de configuración de Registry/Discovery/Policy (mismo
+  hueco heredado, resuelto solo para lectura). Paquete nuevo `packages/dashboard`. Sin ejecución,
+  sin gestión de secretos, sin edición — puro solo-lectura en esta fase.
 - **Fase 13 — Hardening de seguridad**: revisión y refuerzo de seguridad de todo lo anterior.
 - **Fase 14 — Testing e integración**: pruebas automatizadas y de integración end-to-end.
 - **Fase 15 — Documentación y release**: preparación de release pública/interna.

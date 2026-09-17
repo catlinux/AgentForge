@@ -9,7 +9,11 @@ import type {
   SessionId,
   ToolEntry,
 } from "@agentforge/shared";
-import { generateSessionId } from "@agentforge/shared";
+import {
+  AuditWriter as AuditWriterImpl,
+  generateSessionId,
+  resolveAuditLogPath,
+} from "@agentforge/shared";
 import { toMcpToolDescriptors } from "./tools-list.js";
 import { handleToolCall } from "./tools-call.js";
 
@@ -90,8 +94,14 @@ export function createMcpServer(deps: McpServerDeps): Server {
   return server;
 }
 
+/**
+ * DEC-065: when the caller does not inject an `auditWriter`, defaults to a real one pointed at
+ * this process's own Audit Log file (DEC-052/053), instead of silently writing no audit events at
+ * all. Still best-effort/non-blocking (DEC-057) — this default changes nothing about that.
+ */
 export async function startStdioServer(deps: McpServerDeps): Promise<void> {
-  const server = createMcpServer(deps);
+  const auditWriter = deps.auditWriter ?? new AuditWriterImpl(resolveAuditLogPath("mcp-server"));
+  const server = createMcpServer({ ...deps, auditWriter });
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

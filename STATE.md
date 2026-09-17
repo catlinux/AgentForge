@@ -1,7 +1,7 @@
 # STATE.md — AgentForge
 
-**Última actualización:** 2026-09-17 (Fase 10 — Audit Log, EXECUTE+VERIFY completados, pendiente
-de autorización de commit y push)
+**Última actualización:** 2026-09-17 (Fase 12 — Dashboard Web, INSPECT+PLAN+EXECUTE+VERIFY
+completados, pendiente de autorización de commit y push)
 
 ## Proyecto
 
@@ -13,30 +13,39 @@ copiar).
 
 ## Fase actual
 
-**Fase 11 — Connectors**
+**Fase 12 — Dashboard Web**
 
 **Estado:** INSPECT + PLAN + EXECUTE + VERIFY completados (2026-09-17) — 6 decisiones aprobadas
-(DEC-058 a DEC-063: patrón "Connector Execution Backend" — paquete propio por conector
-(`packages/connector-github`), mismo proceso separado que Execution SSH; reutilización del
-contrato `ExecutionRequest`/`ExecutionOutcome`/`ExecutionChannelRequest` existente, con enrutamiento
-por `ToolEntry.origin.id` en el servidor MCP; nueva variante aditiva `"executed-http"` para
-resultados HTTP, nunca forzados en los campos SSH; autenticación por Personal Access Token vía
-`SecretKind "token"` ya existente, sin OAuth en esta fase; 3 operaciones GitHub con plantilla fija,
-nunca HTTP libre del agente; `fetch` nativo de Node, sin dependencia HTTP nueva). Durante EXECUTE
-se verificó, a petición explícita del usuario, que no existe hoy ningún canal real Execution↔
-Secrets Broker en producción (limitación ya heredada de Fase 7, no exclusiva de esta fase) — se
-mantuvo el mismo patrón de inyección ya usado por `execution-ssh`, sin abrir ni ampliar DEC-010.
-Ver `decisions/DECISIONS.md` para el registro formal.
+(DEC-064 a DEC-069: acceso a datos por lectura directa de fichero, sin API externa nueva ni
+reabrir §14; bootstrap mínimo para que `startStdioServer`/`startExecutionServer`/
+`startConnectorServer` construyan un `AuditWriter` real por defecto; Fastify como framework HTTP;
+frontend HTML servido + JavaScript mínimo sin toolchain de build; sin autenticación, bind exclusivo
+a `127.0.0.1`; convención `AGENTFORGE_DATA_DIR` extendida a las rutas de configuración de
+Registry/Discovery/Policy). Durante EXECUTE se verificó, y se consultó explícitamente al usuario
+antes de resolver, que ningún paquete tenía un `main`/CLI real que instanciara `AuditWriter` con
+una ruta de fichero real, ni convención de ruta real para Registry/Discovery/Policy — solo se
+usaban rutas de test en ambos casos, sin excepción. Ver `decisions/DECISIONS.md` para el registro
+formal.
 
-**Implementación:** paquete nuevo `packages/connector-github/` completo (config declarativa,
-máquina de confirmación duplicada con nombres neutros, cliente HTTP sobre `fetch`, orquestador,
-servidor IPC); `ExecutionOutcome`/`ExecutionCompletedEvent` ampliados de forma aditiva con
-`"executed-http"`; `packages/mcp-server` cambia de un `executionClient` fijo a
-`resolveExecutionClient(originId)`, fail-closed si no hay backend configurado;
-`packages/execution-ssh` con un único cambio aditivo (`statusCode`/`responseBytes: undefined` en
-sus dos escrituras de `execution-completed`). **Ningún sistema remoto real tocado** — sin token de
-GitHub real, sin llamada HTTP real fuera de tests. Fases 3 a 10 siguen vigentes sin cambios
-estructurales.
+**Implementación:** paquete nuevo `packages/dashboard/` completo (servidor Fastify, 3 rutas GET de
+solo lectura — `/api/audit`, `/api/tools/registry`, `/api/tools/discovery`, `/api/policy` —,
+lectores que reutilizan `FileToolRegistryStore`/`discoverTools`/`loadPolicyConfig` ya existentes de
+`packages/core`, frontend estático HTML/CSS/JS sin build); `packages/shared/src/paths/` nuevo
+(`resolveAuditLogPath` movido desde `audit/`, más `resolveRegistryCachePath`/
+`resolveDiscoveryConfigPath`/`resolvePolicyConfigPath`); `startStdioServer` (mcp-server),
+`startExecutionServer` (execution-ssh), `startConnectorServer` (connector-github) ahora construyen
+un `AuditWriter` por defecto si no se les inyecta uno explícitamente. **Ningún sistema remoto real
+tocado** — el Dashboard se verificó con fixtures generadas a mano (no existe ninguna ejecución de
+proceso real todavía en el proyecto, ver limitación abajo). Fases 3 a 11 siguen vigentes sin
+cambios estructurales — solo el hueco de wiring de `AuditWriter` cerrado con un valor por defecto.
+
+**Limitación heredada, documentada explícitamente (no introducida por esta fase):** ningún paquete
+tiene todavía un `main`/CLI/`bin` real que arranque `mcp-server`/`execution-ssh`/
+`connector-github` como proceso de producción — son funciones de librería (`createMcpServer`/
+`startStdioServer`, `startExecutionServer`, `startConnectorServer`) con dependencias completamente
+inyectadas. El Dashboard de esta fase, por tanto, no tiene hoy ningún dato real de una ejecución en
+curso que mostrar — se verificó funcionalmente con ficheros de fixture generados a mano. Construir
+ese bootstrap de producción es candidato a una fase futura, no de esta.
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
@@ -47,12 +56,13 @@ APROBADO E IMPLEMENTADO (Fase 5: DEC-023 a DEC-029) + SECRETS BROKER APROBADO E 
 (Fase 6: DEC-030 a DEC-036) + EJECUCIÓN REMOTA/SSH APROBADA E IMPLEMENTADA (Fase 7: DEC-037 a
 DEC-042) + INTEGRACIÓN MCP APROBADA E IMPLEMENTADA (Fase 8: DEC-043 a DEC-047) + SESSIONS
 APROBADAS E IMPLEMENTADAS (Fase 9: DEC-048 a DEC-051) + AUDIT LOG APROBADO E IMPLEMENTADO
-(Fase 10: DEC-052 a DEC-057) + CONNECTORS APROBADO E IMPLEMENTADO (Fase 11: DEC-058 a DEC-063).
-Resto documentado como PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
+(Fase 10: DEC-052 a DEC-057) + CONNECTORS APROBADO E IMPLEMENTADO (Fase 11: DEC-058 a DEC-063) +
+DASHBOARD WEB APROBADO E IMPLEMENTADO (Fase 12: DEC-064 a DEC-069). Resto documentado como
+PROPOSAL/OPEN QUESTION en `architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 11 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
+Fase 12 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
 y de autorización explícita y separada de `git commit` y `git push` (todavía no solicitadas ni
 concedidas para esta fase).
 
@@ -873,6 +883,91 @@ decisión automática.
       trackear). **Pendiente:** autorización explícita y separada de `git commit` y de `git push`
       — todavía no concedidas.
 
+### Fase 12 — Dashboard Web (INSPECT + PLAN + EXECUTE + VERIFY completados, 2026-09-17)
+- [x] INSPECT completo: roadmap/estado real coinciden; identificado que la Fase 12 es la siguiente
+      pendiente; ninguna DEC previa sobre Dashboard; restricción arquitectónica ya fijada en
+      `ARCHITECTURE.md` §15 (consumir los mismos componentes que Claude Code, nunca un segundo
+      camino de acceso). Hallazgo relevante detectado antes del PLAN: `AuditWriter` (Fase 10) se
+      inyecta como parámetro opcional en 4 puntos del código pero nunca se instancia con una ruta
+      real en ningún sitio fuera de su propio test unitario — sin esto, el Dashboard no tendría
+      ningún dato real que mostrar.
+- [x] PLAN presentado y aprobado en una sola ronda (5 decisiones candidatas iniciales, DEC-A a
+      DEC-E del PLAN) — alcance: Dashboard de solo lectura sobre Tool Registry/Discovery, Policy
+      Engine y Audit Log; fuera de alcance explícito: ejecución, gestión de secretos, edición de
+      configuración, autenticación multi-usuario, bootstrap de proceso de producción completo.
+- [x] Durante EXECUTE, dos precisiones de alcance consultadas explícitamente con el usuario antes
+      de implementar (no asumidas): (1) verificado que `startStdioServer`/`startExecutionServer`/
+      `startConnectorServer` son funciones de librería sin ningún `main`/CLI real que las invoque
+      — la propuesta inicial de DEC-065 asumía "3 puntos de arranque ya existentes" como procesos,
+      que no existen como tales; resuelto con un valor por defecto interno en cada start-function,
+      sin crear ningún proceso/CLI nuevo (ampliaría el alcance más allá de lo aprobado); (2)
+      verificado el mismo hueco para `loadDiscoveryConfig`/`loadPolicyConfig`/
+      `FileToolRegistryStore` (ninguna ruta real convencional, solo rutas de test) — resuelto
+      extendiendo la misma convención `AGENTFORGE_DATA_DIR` de DEC-065 en vez de inventar un
+      segundo esquema.
+- [x] **DEC-064** — Acceso a datos del Dashboard: lectura directa de los mismos ficheros que ya
+      consumen Core/MCP server, sin API externa nueva, sin reabrir §14.
+- [x] **DEC-065** — Bootstrap mínimo: cada `start*Server` construye un `AuditWriter` real por
+      defecto (vía `resolveAuditLogPath`) cuando el llamador no inyecta uno, sin crear ningún
+      `main`/CLI/proceso nuevo.
+- [x] **DEC-066** — Framework HTTP: Fastify, sin dependencias con riesgo de compilación nativa.
+- [x] **DEC-067** — Frontend: HTML servido + JavaScript mínimo, sin framework ni toolchain de
+      build.
+- [x] **DEC-068** — Sin autenticación, bind exclusivo a `127.0.0.1`.
+- [x] **DEC-069** — Convención `AGENTFORGE_DATA_DIR` (DEC-065) extendida con
+      `resolveRegistryCachePath`/`resolveDiscoveryConfigPath`/`resolvePolicyConfigPath` en
+      `packages/shared`, usadas solo por el Dashboard para leer.
+- [x] `decisions/DECISIONS.md`, `STATE.md`, `ROADMAP.md`, `DEVELOPMENT.md`,
+      `architecture/ARCHITECTURE.md`/`.en.md` (§15) sincronizados con DEC-064 a DEC-069.
+- [x] Implementación: `packages/shared/src/paths/` (nuevo — `resolveAuditLogPath` movido desde
+      `audit/`, más `resolveRegistryCachePath`/`resolveDiscoveryConfigPath`/
+      `resolvePolicyConfigPath`, todas sobre la misma convención `AGENTFORGE_DATA_DIR`);
+      `packages/mcp-server/src/server.ts` (`startStdioServer` con `AuditWriter` por defecto);
+      `packages/execution-ssh/src/ipc/execution-server.ts` y
+      `packages/connector-github/src/ipc/connector-server.ts` (mismo patrón de valor por defecto);
+      paquete nuevo `packages/dashboard/` completo — `src/server.ts` (app Fastify, bind
+      `127.0.0.1`), `src/routes/` (`audit.ts`/`tools.ts`/`policy.ts`, todas GET), `src/readers/`
+      (`audit-reader.ts` con tolerancia a fichero ausente/línea corrupta,
+      `tools-reader.ts`/`discovery-reader.ts` reutilizando `FileToolRegistryStore`/
+      `discoverTools`/`StaticConfigDiscoveryStrategy` de `packages/core` sin reimplementar
+      parsing, `policy-reader.ts` reutilizando `loadPolicyConfig`), `src/public/` (HTML/CSS/JS
+      estático sin build). `eslint.config.js` excluye `packages/dashboard/src/public/**` (código
+      de navegador fuera del grafo de proyecto TypeScript, mismo criterio que su exclusión de
+      `tsc -b`).
+- [x] Tests nuevos: 3 en `packages/shared/src/paths/resolve-path.test.ts`; 1 en
+      `execution-server.test.ts` y 1 en `connector-server.test.ts` (arranque sin `auditWriter`
+      inyectado no lanza); 7 en `packages/dashboard/src/server.test.ts` (4 rutas de solo lectura
+      con datos vacíos cuando no hay ficheros todavía, servido de HTML estático, verificación
+      estática de que ninguna ruta usa un método distinto de GET, bind a `127.0.0.1`); 4 en
+      `packages/dashboard/src/readers/audit-reader.test.ts` (fichero ausente, parseo válido con
+      orden más-reciente-primero, línea corrupta tolerada sin romper el resto, fusión de varios
+      procesos escritores).
+- [x] **Verificación manual (VERIFY funcional, además de los tests automatizados):** arrancado el
+      servidor Dashboard compilado contra un directorio de datos de fixture generado a mano
+      (`AGENTFORGE_DATA_DIR` apuntando a un directorio temporal fuera del repositorio, sin tocar
+      ningún dato real) — confirmado que las 4 rutas devuelven exactamente los datos de fixture
+      esperados, con el orden más-reciente-primero correcto en Audit Log y el filtrado correcto de
+      Discovery por `activeQualifiedNames`; confirmado que `GET /` sirve la página HTML; confirmado
+      que el servidor solo escucha en `127.0.0.1` (nunca `0.0.0.0`). Fixture eliminado tras la
+      verificación.
+- [x] Alcance respetado: no se implementó ejecución, gestión de secretos, edición de configuración,
+      autenticación multi-usuario, ni un bootstrap de proceso de producción completo (`main`/CLI
+      real) — límite explícitamente confirmado con el usuario durante EXECUTE. Registry, Discovery,
+      Policy Engine, Secrets Broker, Execution SSH/Connectors, Sessions, Audit Log (lógica de
+      escritura) sin modificar salvo el valor por defecto de `AuditWriter` ya descrito. Ningún
+      sistema remoto real tocado.
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 7 paquetes (incluido el nuevo); `pnpm
+      run lint` sin errores (tras excluir `packages/dashboard/src/public/**`, código de navegador
+      no destinado a ESLint con configuración Node/TypeScript); `pnpm run format` correcto (tras
+      `--write` sobre 4 ficheros); `pnpm run test` — 232/234 correctos (2 omitidos en Windows,
+      heredados de Fase 6), incluidos 16 tests nuevos; `pnpm run build` correcto en los 7 paquetes
+      (incluida la copia de `src/public` a `dist/public`); `pnpm install` correcto (única
+      dependencia de runtime nueva: `fastify`, aislada en `packages/dashboard`); grep de
+      secretos/`console.*`/hosts reales del proyecto sin coincidencias; `git status` revisado en su
+      totalidad (10 ficheros modificados, paquete nuevo `packages/dashboard/` y
+      `packages/shared/src/paths/` sin trackear). **Pendiente:** autorización explícita y separada
+      de `git commit` y de `git push` — todavía no concedidas.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -976,6 +1071,12 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
 - **DEC-061** — Autenticación por Personal Access Token vía `SecretKind "token"` existente.
 - **DEC-062** — Alcance funcional: operaciones GitHub con plantilla fija, nunca HTTP libre.
 - **DEC-063** — `fetch` nativo de Node, sin dependencia HTTP nueva.
+- **DEC-064** — Dashboard: acceso a datos por lectura directa de fichero, sin API externa nueva.
+- **DEC-065** — Dashboard: bootstrap mínimo de `AuditWriter` con ruta real por defecto.
+- **DEC-066** — Dashboard: framework HTTP Fastify.
+- **DEC-067** — Dashboard: frontend HTML servido + JS mínimo, sin toolchain de build.
+- **DEC-068** — Dashboard: sin autenticación, bind exclusivo a localhost.
+- **DEC-069** — Dashboard: convención de ruta real para configuración de Registry/Discovery/Policy.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -1067,46 +1168,39 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `8d6670e78a590022b5f0e65eeb8af45fa8c39ed8` (corto: `8d6670e`)
+- Hash: `b301606a2e4f1215a257516f878022d70dbaab0c` (corto: `b301606`)
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `fix: corrige el Audit Log de Fase 10 tras revisión de código real (DEC-052 a DEC-057)`
-- Contenido: 16 archivos, 601 inserciones/30 eliminaciones — segunda ronda de correcciones de
-  Fase 10 tras revisión del código publicado: componente nuevo `PendingConfirmations`
-  (`packages/execution-ssh/src/confirmation/pending-confirmations.ts`) para distinguir
-  cancelación durante confirmación genuinamente pendiente de cancelación sin nada que cancelar,
-  sin tocar `OperationHashRegistry`; eventos `confirmation-requested`/`confirmation-resolved`
-  añadidos al flujo real de `confirmOperation()`; `stdoutBytes`/`stderrBytes` en
-  `ExecutionOutcome`/`ExecutionCompletedEvent`; evento terminal para el caso `unknown-tool`. 15
-  tests nuevos (159/161 en total, 2 omitidos en Windows).
-- Commit anterior directo: `30ee62a` (`feat+docs: implementa Audit Log — Fase 10 (DEC-052 a
-  DEC-057)`, primera implementación de la fase).
-- Commits anteriores: `5c4833d` (Fase 9), `6bdec65` (Fase 8), `86571b7` (Fase 7), `b48670d`
-  (Fase 6), `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2),
-  `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
+- Mensaje: `feat+docs: implementa Connectors (GitHub) — Fase 11 (DEC-058 a DEC-063)`
+- Commits anteriores: `8d6670e` (correcciones Fase 10 tras revisión de código real), `30ee62a`
+  (Fase 10 — primera implementación), `5c4833d` (Fase 9), `6bdec65` (Fase 8), `86571b7` (Fase 7),
+  `b48670d` (Fase 6), `2411dc3` (Fase 5), `624581e` (Fase 4), `1399053` (Fase 3), `4e01064`
+  (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
+- **Los cambios de la Fase 12 (Dashboard Web, DEC-064 a DEC-069) están en el working tree, sin
+  commitear todavía** — pendientes de autorización explícita y separada de `git commit`/`git push`.
 
 ## Estado del push
 
-- **Realizado** (2026-09-17, con autorización explícita del usuario). `master` sincronizado con
-  `origin/master` (`8d6670e`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
-  al mismo hash).
+- `master` sincronizado con `origin/master` en `b301606` (Fase 11) al inicio de esta sesión.
+  Los cambios de la Fase 12 son locales, todavía sin commitear ni pushear.
 
 ## Próxima acción recomendada
 
-1. **Fase 10 (Audit Log) está cerrada**: 6 decisiones aprobadas (DEC-052 a DEC-057), implementada,
-   corregida tras revisión de código real, verificada, commiteada y pusheada (`8d6670e`).
-2. **Fase 11 (Connectors) en curso de planificación** — INSPECT completado (2026-09-17): no existe
-   ninguna DEC previa sobre conectores; `ToolOriginKind` solo admite `"agentforge" | "mcp-server"`;
-   `SecretKind` no tiene un valor específico de OAuth; no hay dependencias HTTP/OAuth instaladas;
-   el patrón `packages/execution-<nombre>` (DEC-008/042) es la referencia directa, con
-   `packages/execution-ssh` como único precedente real. PLAN pendiente de presentar y aprobar antes
-   de EXECUTE.
+1. **Fase 11 (Connectors) está cerrada**: 6 decisiones aprobadas (DEC-058 a DEC-063), implementada,
+   verificada, commiteada y pusheada (`b301606`).
+2. **Fase 12 (Dashboard Web) completada localmente** — INSPECT + PLAN + EXECUTE + VERIFY
+   completados (2026-09-17): 6 decisiones aprobadas (DEC-064 a DEC-069), paquete nuevo
+   `packages/dashboard/` implementado y verificado (typecheck/lint/format/test/build limpios,
+   verificación manual funcional contra fixtures). Pendiente de presentar el resultado de VERIFY
+   al usuario y de autorización explícita y separada de `git commit` y `git push` — todavía no
+   solicitadas ni concedidas.
 3. Decisiones pendientes que siguen abiertas, no bloqueantes: licencia del proyecto, visibilidad
    del repositorio, inconsistencia de idioma Fase 0, traducción al inglés de
    `TECH-STACK-ANALYSIS.md` y `CORE-STRUCTURE-ANALYSIS.md`; el transporte IPC real Core↔Secrets
    Broker (DEC-010) sigue sin implementar (distinto del canal MCP↔Execution de DEC-047, ya
    implementado); el usuario de sistema dedicado en cada host remoto (`ARCHITECTURE.md` §9 OPEN
    QUESTION) sigue sin resolver — no se puede implementar sin tocar esos sistemas, prohibido hasta
-   autorización explícita.
+   autorización explícita; ningún paquete tiene todavía un `main`/CLI de producción real (hallazgo
+   de la Fase 12, ver DEC-065/069) — candidato a una fase futura dedicada.
 
 ## Cómo reprender este trabajo
 

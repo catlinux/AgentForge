@@ -323,3 +323,12 @@ describe("startExecutionServer (DEC-047)", () => {
     socket.destroy();
   });
 });
+
+describe("startExecutionServer default audit writer (DEC-065)", () => {
+  it("starts successfully without throwing when no auditWriter is injected", () => {
+    const deps = makeDeps();
+    const server = startExecutionServer(deps, testSocketPath());
+    expect(server.listening).toBe(true);
+    server.close();
+  });
+});

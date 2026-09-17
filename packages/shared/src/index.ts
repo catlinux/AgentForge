@@ -8,3 +8,4 @@ export * from "./execution/index.js";
 export * from "./mcp/index.js";
 export * from "./session/index.js";
 export * from "./audit/index.js";
+export * from "./paths/index.js";

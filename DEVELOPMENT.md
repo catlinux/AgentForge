@@ -208,6 +208,29 @@ forma del resultado, autenticación, alcance funcional, y dependencia HTTP de Co
   función inyectada sin implementación real (DEC-010 sigue sin implementación en ningún sistema
   operativo). Fuera de alcance de Fase 11, candidata a Fase 13 o una fase dedicada.
 
+**DECIDIDO (DEC-064 a DEC-069, Fase 12, 2026-09-17):** acceso a datos, bootstrap de Audit Log real,
+framework HTTP, frontend, autenticación, y convención de rutas de configuración del Dashboard —
+ver `decisions/DECISIONS.md`.
+
+- **Acceso a datos:** lectura directa de los mismos ficheros que ya consumen Core/MCP server
+  (Registry cache, Discovery/Policy config, Audit Log JSON Lines) — sin API HTTP externa nueva, sin
+  reabrir §14 (DEC-064).
+- **Bootstrap de Audit Log:** `startStdioServer`/`startExecutionServer`/`startConnectorServer`
+  construyen internamente un `AuditWriter` real (vía `resolveAuditLogPath`) cuando el llamador no
+  inyecta uno explícitamente — sin crear ningún `main`/CLI/proceso nuevo (DEC-065).
+- **Framework HTTP:** Fastify, sin dependencias con riesgo de compilación nativa (DEC-066).
+- **Frontend:** HTML servido por el propio servidor + JavaScript mínimo sin framework ni toolchain
+  de build (DEC-067).
+- **Autenticación:** ninguna en esta fase; bind exclusivo a `127.0.0.1` (DEC-068).
+- **Rutas de configuración:** convención `AGENTFORGE_DATA_DIR` (ya introducida por DEC-065)
+  extendida con `resolveRegistryCachePath`/`resolveDiscoveryConfigPath`/`resolvePolicyConfigPath`
+  en `packages/shared`, usadas solo por el Dashboard para leer (DEC-069).
+- **Ubicación:** `packages/dashboard`, paquete propio.
+- **Limitación documentada:** ningún paquete tiene todavía un `main`/CLI real de producción —
+  `startStdioServer`/`startExecutionServer`/`startConnectorServer` siguen siendo funciones de
+  librería, nunca invocadas como proceso real fuera de test. El Dashboard de esta fase se verifica
+  con fixtures generadas a mano, no con datos de una ejecución real.
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando

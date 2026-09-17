@@ -6,6 +6,7 @@ import type {
   OperationId,
   SessionId,
 } from "@agentforge/shared";
+import { AuditWriter as AuditWriterImpl, resolveAuditLogPath } from "@agentforge/shared";
 import { execute, type ExecuteDependencies } from "../execute.js";
 import { cancelOperation } from "../confirmation/cancel.js";
 import { computeOperationHash } from "../confirmation/operation-hash.js";
@@ -38,6 +39,10 @@ export function startConnectorServer(
   auditWriter?: AuditWriter,
 ): Server {
   const pendingConfirmations = deps.pendingConfirmations ?? new PendingConfirmations();
+  // DEC-065: default to a real writer for this process's own Audit Log file when the caller does
+  // not inject one, instead of silently writing no audit events at all.
+  const resolvedAuditWriter =
+    auditWriter ?? new AuditWriterImpl(resolveAuditLogPath("connector-github"));
   const server = createServer((socket: Socket) => {
     let buffer = "";
     socket.on("data", (chunk) => {
@@ -47,7 +52,7 @@ export function startConnectorServer(
         const line = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
         if (line.trim().length === 0) continue;
-        void handleLine(line, socket, deps, pendingConfirmations, auditWriter);
+        void handleLine(line, socket, deps, pendingConfirmations, resolvedAuditWriter);
       }
     });
     socket.on("error", () => {

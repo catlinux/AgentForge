@@ -562,19 +562,26 @@ this phase, append-only JSON Lines.**
 
 ## 15. Dashboard / Web UI (at the architectural level)
 
-**PROPOSAL:**
+**DECISION (DEC-064 to DEC-069, Phase 12):** dedicated package `packages/dashboard`, **read-only**
+— no execution, no secrets management, no configuration editing in this phase.
 
-- The roadmap (`ROADMAP.md`) already contemplates a separate Phase 12 — Web Dashboard. This
-  document does not design the dashboard in detail, but records one architectural constraint: **if
-  a dashboard is built in the future, it must consume the same components Claude Code consumes**
-  (Tool Registry, Audit Log, Policy Engine) through a well-defined interface — it must not become
-  a second access path to credentials or execution that bypasses the Policy Engine or the Secrets
-  Broker.
-- Phase 0.7 research did not identify any technical dashboard pattern differentiated enough to
-  highlight in this phase (`docs/en/research/RELATED-PROJECTS.md`, "Dashboard" section) — this is
-  explicitly left as future-phase work.
+- Honors the architectural constraint already anticipated before this phase: it consumes the same
+  sources of truth Core/MCP server already consume (Tool Registry cache, Discovery and Policy
+  Engine configuration, Audit Log JSON Lines) via **direct file reads**, never a second access path
+  to credentials or execution that bypasses the Policy Engine or the Secrets Broker (DEC-064).
+- HTTP framework: Fastify (DEC-066). Frontend: server-served HTML + minimal JavaScript, no build
+  toolchain (DEC-067). No authentication, bound exclusively to `127.0.0.1` (DEC-068).
+- **Finding verified during this phase:** no package had a real `main`/CLI that constructed
+  `AuditWriter` (Phase 10) with a real file path, nor a real path convention for
+  Registry/Discovery/Policy configuration — only test paths were ever used. Resolved with the
+  smallest possible change: each `start*Server` builds a default `AuditWriter` when the caller
+  does not inject one (DEC-065), and an `AGENTFORGE_DATA_DIR` path convention in `packages/shared`
+  also covers Registry/Discovery/Policy for the Dashboard's read-only use (DEC-069). No package yet
+  has a real production `main`/CLI — that remains future-phase work.
 
-**OPEN QUESTION:** none for phase 1 — this component is deliberately out of scope.
+**OPEN QUESTION:** none blocking — a real production `main`/CLI for
+`mcp-server`/`execution-ssh`/`connector-github` still does not exist, documented as an inherited
+limitation, not one introduced by this phase.
 
 ---
 

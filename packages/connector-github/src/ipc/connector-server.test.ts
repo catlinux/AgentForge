@@ -269,3 +269,12 @@ describe("startConnectorServer (DEC-047 pattern, DEC-058)", () => {
     socket.destroy();
   });
 });
+
+describe("startConnectorServer default audit writer (DEC-065)", () => {
+  it("starts successfully without throwing when no auditWriter is injected", () => {
+    const deps = makeDeps();
+    const server = startConnectorServer(deps, testSocketPath());
+    expect(server.listening).toBe(true);
+    server.close();
+  });
+});

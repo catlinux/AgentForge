@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>AgentForge Dashboard</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>AgentForge Dashboard</h1>
+      <p class="subtitle">Solo lectura — no ejecuta acciones ni gestiona secretos.</p>
+    </header>
+
+    <nav>
+      <button data-tab="audit" class="tab active">Audit Log</button>
+      <button data-tab="registry" class="tab">Tool Registry</button>
+      <button data-tab="discovery" class="tab">Tool Discovery</button>
+      <button data-tab="policy" class="tab">Policy Engine</button>
+    </nav>
+
+    <main>
+      <section id="audit" class="panel active">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Tipo</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="audit-body"></tbody>
+        </table>
+      </section>
+
+      <section id="registry" class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Qualified name</th>
+              <th>Origen</th>
+              <th>Stale</th>
+            </tr>
+          </thead>
+          <tbody id="registry-body"></tbody>
+        </table>
+      </section>
+
+      <section id="discovery" class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Qualified name</th>
+              <th>Descripción</th>
+            </tr>
+          </thead>
+          <tbody id="discovery-body"></tbody>
+        </table>
+      </section>
+
+      <section id="policy" class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Identity</th>
+              <th>Riesgo</th>
+              <th>Override</th>
+            </tr>
+          </thead>
+          <tbody id="policy-body"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

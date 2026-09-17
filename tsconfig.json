@@ -6,6 +6,7 @@
     { "path": "packages/secrets-broker" },
     { "path": "packages/execution-ssh" },
     { "path": "packages/connector-github" },
-    { "path": "packages/mcp-server" }
+    { "path": "packages/mcp-server" },
+    { "path": "packages/dashboard" }
   ]
 }

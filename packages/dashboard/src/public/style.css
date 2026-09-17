@@ -1,0 +1,67 @@
+:root {
+  color-scheme: light dark;
+  --border: #d0d0d0;
+  --muted: #666;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 0 1.5rem 2rem;
+}
+
+header {
+  padding: 1.5rem 0 0.5rem;
+}
+
+.subtitle {
+  color: var(--muted);
+  margin: 0.25rem 0 1rem;
+}
+
+nav {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.tab {
+  border: none;
+  background: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 1rem;
+  border-bottom: 2px solid transparent;
+}
+
+.tab.active {
+  border-bottom-color: currentColor;
+  font-weight: 600;
+}
+
+.panel {
+  display: none;
+}
+
+.panel.active {
+  display: block;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
