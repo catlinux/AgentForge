@@ -9,6 +9,8 @@ export interface SshExecResult {
   readonly stderr: string;
   readonly stdoutTruncated: boolean;
   readonly stderrTruncated: boolean;
+  readonly stdoutBytes: number;
+  readonly stderrBytes: number;
 }
 
 /**
@@ -73,6 +75,8 @@ export function executeOverSsh(
                   stderr: stderr.text,
                   stdoutTruncated: stdout.truncated,
                   stderrTruncated: stderr.truncated,
+                  stdoutBytes: stdout.totalBytes,
+                  stderrBytes: stderr.totalBytes,
                 });
               });
             })

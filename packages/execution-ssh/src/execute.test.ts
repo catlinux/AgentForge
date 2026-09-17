@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  AuditEventInput,
+  AuditWriter,
   ExecutionRequest,
   OperationId,
   PolicyDecision,
@@ -24,8 +26,18 @@ vi.mock("./ssh/client.js", () => ({
     stderr: "",
     stdoutTruncated: false,
     stderrTruncated: false,
+    stdoutBytes: 2,
+    stderrBytes: 0,
   })),
 }));
+
+/** Minimal test double of AuditWriter (DEC-057): captures events instead of writing to disk. */
+class RecordingAuditWriter {
+  readonly events: AuditEventInput[] = [];
+  async write(event: AuditEventInput): Promise<void> {
+    this.events.push(event);
+  }
+}
 
 const { execute } = await import("./execute.js");
 const { executeOverSsh } = await import("./ssh/client.js");
@@ -79,7 +91,7 @@ function allowDecision(overrides: Partial<PolicyDecision> = {}): PolicyDecision 
   };
 }
 
-function makeDeps(response: ConfirmationResponse) {
+function makeDeps(response: ConfirmationResponse, auditWriter?: RecordingAuditWriter) {
   const channel: ConfirmationChannel = {
     requestConfirmation: vi.fn(async () => response),
   };
@@ -90,6 +102,7 @@ function makeDeps(response: ConfirmationResponse) {
     confirmationTimeoutMs: 1000,
     sshTimeoutMs: 1000,
     getSshKeySecret: vi.fn(async () => sshKeySecret),
+    ...(auditWriter !== undefined ? { auditWriter: auditWriter as unknown as AuditWriter } : {}),
   };
 }
 
@@ -109,8 +122,68 @@ describe("execute (Fase 7 orchestrator)", () => {
       stderr: "",
       stdoutTruncated: false,
       stderrTruncated: false,
+      stdoutBytes: 2,
+      stderrBytes: 0,
     });
     expect(deps.confirmationChannel.requestConfirmation).not.toHaveBeenCalled();
+  });
+
+  it("verdict allow: never calls confirmOperation, so no confirmation-requested/resolved event is written", async () => {
+    const auditWriter = new RecordingAuditWriter();
+    const deps = makeDeps({ kind: "approved" }, auditWriter);
+    await execute(makeRequest(), allowDecision(), deps);
+
+    expect(auditWriter.events.filter((e) => e.type.startsWith("confirmation-"))).toHaveLength(0);
+  });
+
+  it("verdict requires-confirmation + approved: writes confirmation-requested then confirmation-resolved(approved)", async () => {
+    const auditWriter = new RecordingAuditWriter();
+    const deps = makeDeps({ kind: "approved" }, auditWriter);
+    await execute(
+      makeRequest(),
+      allowDecision({ verdict: "requires-confirmation", baseRisk: "destructive" }),
+      deps,
+    );
+
+    expect(auditWriter.events.map((e) => e.type)).toEqual([
+      "confirmation-requested",
+      "confirmation-resolved",
+    ]);
+    const resolved = auditWriter.events[1];
+    expect(resolved?.type === "confirmation-resolved" && resolved.reason).toBe("approved");
+    expect(auditWriter.events.every((e) => e.operationId === operationId)).toBe(true);
+    expect(auditWriter.events.every((e) => e.sessionId === sessionId)).toBe(true);
+  });
+
+  it("verdict requires-confirmation + rejected: writes confirmation-resolved(rejected)", async () => {
+    const auditWriter = new RecordingAuditWriter();
+    const deps = makeDeps({ kind: "rejected" }, auditWriter);
+    await execute(makeRequest(), allowDecision({ verdict: "requires-confirmation" }), deps);
+
+    const resolved = auditWriter.events.find((e) => e.type === "confirmation-resolved");
+    expect(resolved?.type === "confirmation-resolved" && resolved.reason).toBe("rejected");
+  });
+
+  it("verdict requires-confirmation + timeout: writes confirmation-resolved(timed-out)", async () => {
+    const auditWriter = new RecordingAuditWriter();
+    const deps = makeDeps({ kind: "timed-out" }, auditWriter);
+    await execute(makeRequest(), allowDecision({ verdict: "requires-confirmation" }), deps);
+
+    const resolved = auditWriter.events.find((e) => e.type === "confirmation-resolved");
+    expect(resolved?.type === "confirmation-resolved" && resolved.reason).toBe("timed-out");
+  });
+
+  it("hash already used: skips the channel and writes confirmation-resolved(already-used), no confirmation-requested", async () => {
+    const auditWriter = new RecordingAuditWriter();
+    const deps = makeDeps({ kind: "approved" }, auditWriter);
+    await execute(makeRequest(), allowDecision({ verdict: "requires-confirmation" }), deps);
+    auditWriter.events.length = 0;
+
+    await execute(makeRequest(), allowDecision({ verdict: "requires-confirmation" }), deps);
+
+    expect(auditWriter.events.map((e) => e.type)).toEqual(["confirmation-resolved"]);
+    const resolved = auditWriter.events[0];
+    expect(resolved?.type === "confirmation-resolved" && resolved.reason).toBe("already-used");
   });
 
   it("verdict deny: never touches SSH or the Secrets Broker", async () => {

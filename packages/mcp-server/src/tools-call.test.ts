@@ -51,6 +51,8 @@ function makeDeps(overrides: Partial<ToolsCallDeps> = {}): ToolsCallDeps {
             stderr: "",
             stdoutTruncated: false,
             stderrTruncated: false,
+            stdoutBytes: 0,
+            stderrBytes: 0,
           },
         }) as ExecutionChannelResponse,
     ),
@@ -116,6 +118,8 @@ describe("handleToolCall (DEC-045)", () => {
         stderr: "",
         stdoutTruncated: false,
         stderrTruncated: false,
+        stdoutBytes: 0,
+        stderrBytes: 0,
       },
     });
     await callPromise;
@@ -148,6 +152,8 @@ describe("handleToolCall (DEC-045)", () => {
               stderr: "",
               stdoutTruncated: false,
               stderrTruncated: false,
+              stdoutBytes: 0,
+              stderrBytes: 0,
             },
           };
         }),
@@ -215,6 +221,8 @@ describe("handleToolCall (DEC-045)", () => {
               stderr: "",
               stdoutTruncated: false,
               stderrTruncated: false,
+              stdoutBytes: 0,
+              stderrBytes: 0,
             },
           };
         }),
@@ -244,6 +252,8 @@ describe("handleToolCall (DEC-045)", () => {
               stderr: "",
               stdoutTruncated: false,
               stderrTruncated: false,
+              stdoutBytes: 0,
+              stderrBytes: 0,
             },
           };
         }),

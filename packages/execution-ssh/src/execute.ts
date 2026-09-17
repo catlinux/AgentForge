@@ -1,4 +1,5 @@
 import type {
+  AuditWriter,
   ExecutionOutcome,
   ExecutionRequest,
   PolicyDecision,
@@ -7,6 +8,7 @@ import type {
 import type { ConfirmationChannel } from "./confirmation/confirmation-channel.js";
 import { confirmOperation } from "./confirmation/confirm.js";
 import type { OperationHashRegistry } from "./confirmation/hash-registry.js";
+import type { PendingConfirmations } from "./confirmation/pending-confirmations.js";
 import { resolveCommandTemplate } from "./config/command-template.js";
 import { findHost, type ExecutionConfig } from "./config/host-config.js";
 import { executeOverSsh } from "./ssh/client.js";
@@ -21,6 +23,15 @@ export interface ExecuteDependencies {
    * so this module never depends on a concrete Secrets Broker transport (DEC-010 still a
    * placeholder) — only on the already-approved secret record shape. */
   readonly getSshKeySecret: (hostId: string) => Promise<SecretRecord | undefined>;
+  /** Optional (DEC-052/054/057): best-effort audit writer for the confirmation events this
+   * function is responsible for (confirmation-requested, confirmation-resolved). Its absence or
+   * any write failure never affects confirmation or execution behavior. */
+  readonly auditWriter?: AuditWriter;
+  /** Optional (Fase 10): tracks confirmations currently in flight, separate from
+   * `confirmationRegistry` (DEC-038/045 security state) — used only so `execution-server.ts` can
+   * tell a genuinely-pending cancellation apart from one with nothing to cancel. Never affects
+   * authorization or execution. */
+  readonly pendingConfirmations?: PendingConfirmations;
 }
 
 /**
@@ -66,10 +77,14 @@ export async function execute(
           hostname: host.hostname,
           schemaFingerprint: decision.schemaFingerprint,
           resolvedCommand,
+          sessionId: request.sessionId,
+          operationId: request.operationId,
         },
         deps.confirmationChannel,
         deps.confirmationRegistry,
         deps.confirmationTimeoutMs,
+        deps.auditWriter,
+        deps.pendingConfirmations,
       );
     } catch {
       // Any failure of the confirmation channel itself (e.g. an I/O error) must fail closed,

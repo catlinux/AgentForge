@@ -3,7 +3,16 @@ import { connect, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { platform } from "node:os";
-import type { PolicyDecision, SchemaFingerprint, SecretId, ToolIdentity } from "@agentforge/shared";
+import type {
+  AuditEventInput,
+  AuditWriter,
+  OperationId,
+  PolicyDecision,
+  SchemaFingerprint,
+  SecretId,
+  SessionId,
+  ToolIdentity,
+} from "@agentforge/shared";
 import { startExecutionServer } from "./execution-server.js";
 import { OperationHashRegistry } from "../confirmation/hash-registry.js";
 import type { ConfirmationChannel } from "../confirmation/confirmation-channel.js";
@@ -13,6 +22,16 @@ import type { ExecuteDependencies } from "../execute.js";
 
 const identity = "tool-1" as ToolIdentity;
 const fingerprint = "fp-1" as SchemaFingerprint;
+const sessionId = "session-1" as SessionId;
+const operationId = "operation-1" as OperationId;
+
+/** Minimal test double of AuditWriter (DEC-057): captures events instead of writing to disk. */
+class RecordingAuditWriter {
+  readonly events: AuditEventInput[] = [];
+  async write(event: AuditEventInput): Promise<void> {
+    this.events.push(event);
+  }
+}
 
 function testSocketPath(): string {
   if (platform() === "win32") {
@@ -146,6 +165,8 @@ describe("startExecutionServer (DEC-047)", () => {
         hostId: "host-1",
         parameters: {},
         schemaFingerprint: fingerprint,
+        sessionId,
+        operationId,
       })}\n`,
     );
     await new Promise((r) => setTimeout(r, 20));
@@ -159,6 +180,8 @@ describe("startExecutionServer (DEC-047)", () => {
           hostId: "host-1",
           parameters: {},
           decision: decision({ verdict: "requires-confirmation" }),
+          sessionId,
+          operationId,
         },
       })}\n`,
     );
@@ -166,6 +189,137 @@ describe("startExecutionServer (DEC-047)", () => {
     const parsed = JSON.parse(line);
     expect(parsed.outcome.kind).toBe("confirmation-required-but-missing");
     expect(parsed.outcome.reason).toBe("cancelled");
+    socket.destroy();
+  });
+
+  it("cancel message for an operation with no pending confirmation does NOT write a false confirmation-resolved event", async () => {
+    const auditWriter = new RecordingAuditWriter();
+    const deps = makeDeps();
+    server = startExecutionServer(deps, socketPath, auditWriter as unknown as AuditWriter);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const socket = connect(socketPath);
+    await new Promise((r) => socket.once("connect", r));
+    // No confirmOperation() call ever happened for this tuple (e.g. cancelled before Execution
+    // received any "execute" message, or the verdict never required confirmation at all) — the
+    // registry has no entry for this hash.
+    socket.write(
+      `${JSON.stringify({
+        kind: "cancel",
+        identity,
+        hostId: "host-1",
+        parameters: {},
+        schemaFingerprint: fingerprint,
+        sessionId,
+        operationId,
+      })}\n`,
+    );
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(auditWriter.events).toHaveLength(0);
+    socket.destroy();
+  });
+
+  it('cancel message arriving after the confirmation was already resolved (hash marked "used") does NOT write a duplicate/false confirmation-resolved event', async () => {
+    const auditWriter = new RecordingAuditWriter();
+    const deps = makeDeps();
+    server = startExecutionServer(deps, socketPath, auditWriter as unknown as AuditWriter);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const socket = connect(socketPath);
+    await new Promise((r) => socket.once("connect", r));
+
+    // First, a real confirmation flow runs to completion (approved) — this is the genuine
+    // "pending confirmation" case, and confirmOperation() itself (Fase 10 fix #1) is responsible
+    // for writing confirmation-requested/confirmation-resolved(approved) around it.
+    socket.write(
+      `${JSON.stringify({
+        kind: "execute",
+        request: {
+          identity,
+          hostId: "host-1",
+          parameters: {},
+          decision: decision({ verdict: "requires-confirmation" }),
+          sessionId,
+          operationId,
+        },
+      })}\n`,
+    );
+    await readOneLine(socket);
+    auditWriter.events.length = 0; // isolate this test to what the cancel message alone writes
+
+    // A cancel arriving afterwards for the exact same tuple: DEC-045 guarantee 5 says this must
+    // not retroactively invalidate the already-approved execution — and per this fix, it must not
+    // fabricate a second confirmation-resolved event either, since nothing was resolved by this
+    // cancel (the hash is "used", cancelOperation() is a no-op, cancelling nothing).
+    socket.write(
+      `${JSON.stringify({
+        kind: "cancel",
+        identity,
+        hostId: "host-1",
+        parameters: {},
+        schemaFingerprint: fingerprint,
+        sessionId,
+        operationId,
+      })}\n`,
+    );
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(auditWriter.events).toHaveLength(0);
+    socket.destroy();
+  });
+
+  it("cancel message arriving while a confirmation is genuinely pending (operator has not answered yet) DOES write confirmation-resolved(cancelled)", async () => {
+    const auditWriter = new RecordingAuditWriter();
+    // A channel that never resolves — simulates the operator not having answered yet, so the
+    // confirmation stays genuinely in flight (tracked by PendingConfirmations, Fase 10) until the
+    // cancel arrives.
+    const neverResolvingChannel: ConfirmationChannel = {
+      requestConfirmation: () => new Promise(() => {}),
+    };
+    const deps = { ...makeDeps(), confirmationChannel: neverResolvingChannel };
+    server = startExecutionServer(deps, socketPath, auditWriter as unknown as AuditWriter);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const socket = connect(socketPath);
+    await new Promise((r) => socket.once("connect", r));
+    socket.write(
+      `${JSON.stringify({
+        kind: "execute",
+        request: {
+          identity,
+          hostId: "host-1",
+          parameters: {},
+          decision: decision({ verdict: "requires-confirmation" }),
+          sessionId,
+          operationId,
+        },
+      })}\n`,
+    );
+    // No response read here — the "execute" request never resolves (channel never answers). Give
+    // confirmOperation() time to reach PendingConfirmations.add() before cancelling.
+    await new Promise((r) => setTimeout(r, 20));
+    auditWriter.events.length = 0; // discard the confirmation-requested event written above
+
+    socket.write(
+      `${JSON.stringify({
+        kind: "cancel",
+        identity,
+        hostId: "host-1",
+        parameters: {},
+        schemaFingerprint: fingerprint,
+        sessionId,
+        operationId,
+      })}\n`,
+    );
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(auditWriter.events).toHaveLength(1);
+    expect(auditWriter.events[0]).toMatchObject({
+      type: "confirmation-resolved",
+      reason: "cancelled",
+      identity,
+    });
     socket.destroy();
   });
 });

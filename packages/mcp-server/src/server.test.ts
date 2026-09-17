@@ -58,6 +58,8 @@ function makeDeps(captured: ExecutionChannelRequest[]): McpServerDeps {
           stderr: "",
           stdoutTruncated: false,
           stderrTruncated: false,
+          stdoutBytes: 0,
+          stderrBytes: 0,
         },
       };
     }),

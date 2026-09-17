@@ -70,6 +70,18 @@ export async function handleToolCall(
 
   const entry = await deps.resolveToolEntry(mcpToolName);
   if (entry === undefined) {
+    void deps.auditWriter?.write({
+      type: "execution-completed",
+      operationId,
+      sessionId,
+      identity: undefined,
+      outcomeKind: "unknown-tool",
+      exitCode: undefined,
+      reason: "Unknown tool",
+      outputTruncated: undefined,
+      stdoutBytes: undefined,
+      stderrBytes: undefined,
+    });
     return { isError: true, content: "Unknown tool" };
   }
   const identity = entry.identity;
@@ -162,6 +174,8 @@ export async function handleToolCall(
         exitCode: undefined,
         reason: response.reason,
         outputTruncated: undefined,
+        stdoutBytes: undefined,
+        stderrBytes: undefined,
       });
       return { isError: true, content: response.reason };
     }

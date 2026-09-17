@@ -8,7 +8,9 @@ import type {
 } from "@agentforge/shared";
 import { execute, type ExecuteDependencies } from "../execute.js";
 import { cancelOperation } from "../confirmation/cancel.js";
+import { computeOperationHash } from "../confirmation/operation-hash.js";
 import type { OperationHashRegistry } from "../confirmation/hash-registry.js";
+import { PendingConfirmations } from "../confirmation/pending-confirmations.js";
 
 type IncomingMessage =
   | { readonly kind: "execute"; readonly request: ExecutionChannelRequest }
@@ -40,6 +42,10 @@ export function startExecutionServer(
   socketPath: string,
   auditWriter?: AuditWriter,
 ): Server {
+  // One tracker per server instance (Fase 10) — not per message, same lifetime as
+  // `deps.confirmationRegistry`. Built here when the caller does not already provide one via
+  // `deps.pendingConfirmations`, so existing callers/tests need no changes.
+  const pendingConfirmations = deps.pendingConfirmations ?? new PendingConfirmations();
   const server = createServer((socket: Socket) => {
     let buffer = "";
     socket.on("data", (chunk) => {
@@ -51,7 +57,7 @@ export function startExecutionServer(
         const line = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
         if (line.trim().length === 0) continue;
-        void handleLine(line, socket, deps, auditWriter);
+        void handleLine(line, socket, deps, pendingConfirmations, auditWriter);
       }
     });
     socket.on("error", () => {
@@ -67,6 +73,7 @@ async function handleLine(
   line: string,
   socket: Socket,
   deps: ExecuteDependencies & { readonly confirmationRegistry: OperationHashRegistry },
+  pendingConfirmations: PendingConfirmations,
   auditWriter: AuditWriter | undefined,
 ): Promise<void> {
   let message: IncomingMessage;
@@ -78,6 +85,23 @@ async function handleLine(
   }
 
   if (message.kind === "cancel") {
+    // Determine, before mutating the registry, whether a confirmation was actually pending for
+    // this exact operation tuple. `OperationHashRegistry` itself cannot answer this — it only
+    // knows terminal states ("used"/"cancelled"), never "in flight, awaiting the operator" — so a
+    // cancellation arriving while a confirmation is genuinely pending would otherwise look
+    // identical, at the registry level, to one arriving for an operation that never required
+    // confirmation at all. `pendingConfirmations` (Fase 10) is a separate, minimal tracker built
+    // exactly for this: it never participates in the authorization decision, only in whether this
+    // audit event is accurate.
+    const hadPendingConfirmation = pendingConfirmations.has(
+      computeOperationHash(
+        message.identity,
+        message.parameters,
+        message.hostId,
+        message.schemaFingerprint,
+      ),
+    );
+
     cancelOperation(
       deps.confirmationRegistry,
       message.identity,
@@ -88,13 +112,22 @@ async function handleLine(
     // Cancellation acknowledgement carries no outcome — it is fire-and-forget from the client's
     // perspective, consistent with DEC-045: the client does not need a response to know it must
     // treat the operation as cancelled on its own side too.
-    void auditWriter?.write({
-      type: "confirmation-resolved",
-      operationId: message.operationId,
-      sessionId: message.sessionId,
-      identity: message.identity,
-      reason: "cancelled",
-    });
+    //
+    // Only emit `confirmation-resolved` when a confirmation was genuinely pending (DEC-054/055:
+    // audit events must reflect only what is actually true). A "cancel" message can arrive for an
+    // operation that never required confirmation at all (e.g. verdict "allow", cancelled before
+    // Execution even received the "execute" message) — in that case nothing here was ever
+    // resolved, and `tools-call.ts` already recorded the cancellation from the MCP server's own
+    // side via `operation-cancelled { phase: "before-execution" }`.
+    if (hadPendingConfirmation) {
+      void auditWriter?.write({
+        type: "confirmation-resolved",
+        operationId: message.operationId,
+        sessionId: message.sessionId,
+        identity: message.identity,
+        reason: "cancelled",
+      });
+    }
     return;
   }
 
@@ -110,7 +143,7 @@ async function handleLine(
           operationId,
         },
         message.request.decision,
-        deps,
+        { ...deps, pendingConfirmations, ...(auditWriter !== undefined ? { auditWriter } : {}) },
       );
       const response: ExecutionChannelResponse = { ok: true, outcome };
       writeResponse(socket, response);
@@ -131,6 +164,8 @@ async function handleLine(
           outcome.kind === "executed"
             ? outcome.stdoutTruncated || outcome.stderrTruncated
             : undefined,
+        stdoutBytes: outcome.kind === "executed" ? outcome.stdoutBytes : undefined,
+        stderrBytes: outcome.kind === "executed" ? outcome.stderrBytes : undefined,
       });
     } catch {
       writeResponse(socket, { ok: false, reason: "Execution failed unexpectedly" });
@@ -143,6 +178,8 @@ async function handleLine(
         exitCode: undefined,
         reason: "unexpected-error",
         outputTruncated: undefined,
+        stdoutBytes: undefined,
+        stderrBytes: undefined,
       });
     }
     return;

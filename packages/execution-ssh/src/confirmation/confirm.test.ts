@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SchemaFingerprint, ToolIdentity } from "@agentforge/shared";
+import type { OperationId, SchemaFingerprint, SessionId, ToolIdentity } from "@agentforge/shared";
 import type {
   ConfirmationChannel,
   ConfirmationPrompt,
@@ -8,6 +8,8 @@ import type {
 import { confirmOperation, type ConfirmationRequest } from "./confirm.js";
 import { OperationHashRegistry } from "./hash-registry.js";
 import { cancelOperation } from "./cancel.js";
+import { PendingConfirmations } from "./pending-confirmations.js";
+import { computeOperationHash } from "./operation-hash.js";
 
 class ScriptedChannel implements ConfirmationChannel {
   public readonly promptsSeen: ConfirmationPrompt[] = [];
@@ -26,6 +28,8 @@ function makeRequest(overrides: Partial<ConfirmationRequest> = {}): Confirmation
     hostname: "example.internal",
     schemaFingerprint: "fp-1" as SchemaFingerprint,
     resolvedCommand: ["cat", "/a"],
+    sessionId: "session-1" as SessionId,
+    operationId: "operation-1" as OperationId,
     ...overrides,
   };
 }
@@ -182,4 +186,57 @@ describe("confirmOperation (DEC-038)", () => {
       ),
     ).toBe("used");
   });
+
+  // --- Fase 10: PendingConfirmations (audit-only tracking, never authorization) ---
+
+  it("marks the hash pending before requesting confirmation, and clears it once resolved (approved)", async () => {
+    const pendingSeen: boolean[] = [];
+    const channel: ConfirmationChannel = {
+      requestConfirmation: async () => {
+        pendingSeen.push(pending.has(operationHashFor(makeRequest())));
+        return { kind: "approved" };
+      },
+    };
+    const registry = new OperationHashRegistry();
+    const pending = new PendingConfirmations();
+
+    await confirmOperation(makeRequest(), channel, registry, 1000, undefined, pending);
+
+    expect(pendingSeen).toEqual([true]); // pending while the channel was awaiting a response
+    expect(pending.has(operationHashFor(makeRequest()))).toBe(false); // cleared afterwards
+  });
+
+  it("clears the pending entry even when the channel throws", async () => {
+    const channel: ConfirmationChannel = {
+      requestConfirmation: async () => {
+        throw new Error("channel I/O error");
+      },
+    };
+    const registry = new OperationHashRegistry();
+    const pending = new PendingConfirmations();
+
+    await expect(
+      confirmOperation(makeRequest(), channel, registry, 1000, undefined, pending),
+    ).rejects.toThrow("channel I/O error");
+
+    expect(pending.has(operationHashFor(makeRequest()))).toBe(false);
+  });
+
+  it("never marks the hash pending when it was already resolved (used/cancelled) — no channel call happens", async () => {
+    const req = makeRequest();
+    const channel = new ScriptedChannel({ kind: "approved" });
+    const registry = new OperationHashRegistry();
+    const pending = new PendingConfirmations();
+
+    cancelOperation(registry, req.identity, req.parameters, req.hostId, req.schemaFingerprint);
+    await confirmOperation(req, channel, registry, 1000, undefined, pending);
+
+    expect(pending.has(operationHashFor(req))).toBe(false);
+    expect(channel.promptsSeen).toHaveLength(0);
+  });
 });
+
+function operationHashFor(req: ConfirmationRequest) {
+  // Re-derive the same hash confirmOperation computes internally, for assertions in tests above.
+  return computeOperationHash(req.identity, req.parameters, req.hostId, req.schemaFingerprint);
+}

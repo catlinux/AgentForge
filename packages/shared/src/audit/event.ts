@@ -68,6 +68,10 @@ export interface ExecutionCompletedEvent extends AuditEventBase {
   readonly exitCode: number | undefined;
   readonly reason: string | undefined;
   readonly outputTruncated: boolean | undefined;
+  /** Total bytes received before truncation (DEC-055) — only known when `outcomeKind ===
+   * "executed"`, never the stdout/stderr content itself. */
+  readonly stdoutBytes: number | undefined;
+  readonly stderrBytes: number | undefined;
 }
 
 export type CancellationPhase = "before-execution" | "during-confirmation" | "after-authorization";

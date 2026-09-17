@@ -728,8 +728,79 @@ decisión automática.
       incluidos 5 tests nuevos de auditoría; `pnpm run build` correcto en los 5 paquetes; `pnpm
       install --frozen-lockfile` correcto (sin dependencias nuevas); grep de secretos/`console.*`
       sobre el diff y sobre `packages/shared/src/audit/` sin coincidencias; `git status` revisado
-      en su totalidad. **Pendiente:** autorización explícita y separada de `git commit` y de
-      `git push` — todavía no concedidas para esta fase.
+      en su totalidad. Commit `30ee62a` (2026-09-17), push a `origin/master` autorizado y
+      realizado.
+
+### Fase 10 — segunda ronda: correcciones tras revisión de código real en GitHub (2026-09-17)
+- [x] El usuario revisó el código publicado (no solo el resultado textual de VERIFY) y detectó 4
+      discrepancias entre DEC-052 a DEC-057 y la implementación real. Analizadas una por una contra
+      el código antes de corregir, sin reabrir ninguna DEC:
+  1. **Eventos de confirmación en el flujo normal ausentes.** `confirmOperation()`
+     (`confirm.ts`) no escribía `confirmation-requested`/`confirmation-resolved` en ningún caso
+     real (aprobado/rechazado/timeout/ya-usado) — solo `execution-server.ts` los escribía, y
+     únicamente para el mensaje `"cancel"`. Corregido: `confirmOperation()` recibe un
+     `AuditWriter` opcional y escribe ambos eventos en los 5 puntos de salida reales, sin tocar
+     la lógica de `OperationHashRegistry`/DEC-038/045.
+  2. **Cancelación antes de Execution generaba un evento falso.** `execution-server.ts` escribía
+     `confirmation-resolved{reason:"cancelled"}` para **cualquier** mensaje `"cancel"`, incluso
+     cuando nunca hubo una confirmación pendiente (p. ej. verdict `allow`, cancelado antes de
+     que Execution recibiera el `"execute"`). Se detectó durante el análisis que
+     `OperationHashRegistry` (3 estados: absent/used/cancelled) no puede por sí solo distinguir
+     "cancelación durante confirmación realmente en vuelo" de "nunca hubo nada que cancelar" —
+     ambos casos dejan el hash ausente en el momento de cancelar. Se comparó explícitamente
+     añadir un 4º estado `pending` a `OperationHashRegistry` (reabriría DEC-038/045 y su garantía
+     documentada de "three states, never surviving a process restart") frente a crear una
+     estructura nueva y separada solo para auditoría — **elegida la segunda opción**: nuevo
+     componente `PendingConfirmations` (`confirmation/pending-confirmations.ts`), poblado por
+     `confirmOperation()` justo antes/después del único `await` a
+     `channel.requestConfirmation()` (con `finally` para garantizar limpieza incluso si el canal
+     lanza), consultado por `execution-server.ts` antes de decidir si escribe el evento. Nunca
+     participa en autorización ni ejecución — aislamiento explícito coherente con DEC-056.
+  3. **Longitud de stdout/stderr no registrada (DEC-055 exige longitud + truncado).** Verificado
+     contra `ssh/client.ts`/`output-limits.ts` que el total de bytes recibidos antes de truncar
+     ya se calcula dentro de `truncateOutput()` (sobre los chunks concatenados, antes del
+     recorte) — no hace falta inferirlo del texto ya truncado. Añadido `totalBytes` a
+     `TruncatedOutput`, propagado como `stdoutBytes`/`stderrBytes` en `SshExecResult` y
+     `ExecutionOutcome` (extensión estructural de Fase 7, sin cambiar límites/comportamiento
+     SSH), y expuesto en `ExecutionCompletedEvent`. Nombre elegido tras confirmar con el usuario
+     la semántica exacta: bytes recibidos por este proceso antes de truncar, no una garantía
+     absoluta de lo producido por el comando remoto en todos los casos límite.
+  4. **Caso "unknown-tool" sin evento terminal.** `tools-call.ts` devolvía el error sin escribir
+     ningún `execution-completed`, aunque `outcomeKind: "unknown-tool"` ya existía en el tipo
+     (DEC-054) sin usarse nunca. Corregido: se escribe `execution-completed{outcomeKind:
+     "unknown-tool", identity: undefined}` antes de devolver el error.
+- [x] Implementación: `packages/execution-ssh/src/confirmation/pending-confirmations.ts` (nuevo,
+      `PendingConfirmations`: `add`/`remove`/`has` sobre un `Set<OperationHash>`, in-memory, no
+      persistente); `confirm.ts` (escribe `confirmation-requested`/`confirmation-resolved` en
+      los 5 casos, usa `PendingConfirmations` alrededor del único `await`);
+      `execution-server.ts` (construye/propaga `PendingConfirmations`, usa `.has()` en vez de
+      `registry.get() !== undefined` para decidir si escribe `confirmation-resolved` en
+      cancelación, añade `stdoutBytes`/`stderrBytes` a `execution-completed`); `execute.ts`
+      (propaga `auditWriter`/`pendingConfirmations` a `confirmOperation()`); `ssh/client.ts` y
+      `ssh/output-limits.ts` (`totalBytes`); `packages/shared/src/execution/result.ts` y
+      `packages/shared/src/audit/event.ts` (`stdoutBytes`/`stderrBytes`); `tools-call.ts`
+      (evento `unknown-tool`).
+- [x] Tests nuevos: `pending-confirmations.test.ts` (4, componente aislado); `confirm.test.ts`
+      (+3: marca/desmarca pending en flujo normal, limpieza garantizada si el canal lanza, nunca
+      marca pending si el hash ya estaba resuelto); `execute.test.ts` (+5: eventos de
+      confirmación en los 4 casos reales + verificación de que verdict `allow` no escribe
+      ningún evento de confirmación); `execution-server.test.ts` (+3: cancelación sin
+      confirmación pendiente no escribe evento falso, cancelación tras confirmación ya resuelta
+      tampoco, cancelación durante confirmación genuinamente en vuelo sí lo escribe — este
+      último usa un canal que nunca resuelve para simular el caso real).
+- [x] Alcance respetado: `OperationHashRegistry`, `hash-registry.ts`, `cancel.ts`,
+      `operation-hash.ts` sin modificar; DEC-038/045 no reabiertas; `PendingConfirmations` nunca
+      participa en autorización/ejecución; sin dependencias nuevas; comportamiento SSH sin
+      cambios; sin contenido de stdout/stderr registrado.
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 5 paquetes; `pnpm run lint` sin
+      errores; `pnpm run format` correcto (tras `--write` sobre 2 ficheros); `pnpm run test` —
+      159/161 correctos (2 omitidos en Windows, heredados de Fase 6), incluidos 15 tests nuevos
+      de esta ronda; `pnpm run build` correcto en los 5 paquetes; `pnpm install
+      --frozen-lockfile` correcto (sin dependencias nuevas); grep de secretos/`console.*` sobre
+      el diff y los ficheros nuevos sin coincidencias; `git status`/`git diff --stat` revisados
+      en su totalidad (13 ficheros modificados, 2 nuevos, coincide exactamente con los 4 puntos
+      corregidos). **Pendiente:** autorización explícita y separada de `git commit` y de
+      `git push` para esta segunda ronda — todavía no concedidas.
 
 ## Documentación sincronizada
 
