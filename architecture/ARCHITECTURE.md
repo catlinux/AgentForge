@@ -484,7 +484,18 @@ quedan como evolución futura explícita.
 
 ## 12. Auditoría y observabilidad
 
-**PROPOSAL** (ya esbozado en Fase 0, precisado con hallazgos de Fase 0.7):
+**DECISIÓN (DEC-052 a DEC-057, Fase 10):** arquitectura de escritura, formato de persistencia,
+modelo de eventos, minimización de datos, propagación de identificadores, y garantías ya están
+decididos — ver `decisions/DECISIONS.md`. Resumen: cada proceso (servidor MCP, Execution) escribe
+sus propios eventos de forma autónoma, sin componente dedicado nuevo; fichero JSON Lines
+append-only por proceso escritor; `operationId` nuevo, único por invocación de `tools/call`,
+explícitamente distinto de `SessionId` (Fase 9) y de `OperationHash` (DEC-038, que puede repetirse
+entre invocaciones con los mismos argumentos), propagado a Execution y al contrato de cancelación;
+minimización estricta (nunca secretos/claves/passphrases/stdout-stderr completos/parámetros en
+bruto/comando resuelto en texto/hostname-username/errores crudos de librerías); persistencia best
+effort, nunca bloqueante ni condicionante de la operación real que describe.
+
+**PROPOSAL (contexto histórico, Fase 1 — ver DEC-052 a DEC-057 arriba para lo ya decidido):**
 
 - Campos mínimos por registro: comanda resuelta completa, host destino, nombre de herramienta/
   operación, parámetros suministrados por el LLM, timestamp, duración, código de salida,
@@ -503,10 +514,8 @@ quedan como evolución futura explícita.
   esto autónomamente" y "el humano lo aprobó explícitamente" — relevante para la reconstrucción
   forense en caso de incidente.
 
-**OPEN QUESTION:** formato/almacenamiento concreto (fichero local JSON Lines vs. SQLite vs. otro)
-— depende del stack tecnológico (§17). **PROPOSAL preliminar:** empezar con fichero JSON Lines
-append-only (simple, sin dependencias, fácil de inspeccionar manualmente), migrar a un
-almacenamiento consultable (SQLite) si el volumen o la necesidad de consulta lo justifican.
+~~**OPEN QUESTION:** formato/almacenamiento concreto (fichero local JSON Lines vs. SQLite vs.
+otro)~~ — **resuelto en Fase 10, ver DEC-053.**
 
 ---
 
@@ -524,8 +533,8 @@ almacenamiento consultable (SQLite) si el volumen o la necesidad de consulta lo 
   el principio local-first de `README.md`) antes que a un motor de base de datos con servidor
   propio.
 
-**OPEN QUESTION:** ninguna bloqueante para la fase 1 — esta decisión se puede posponer sin
-condicionar el resto de la arquitectura.
+~~**OPEN QUESTION:** ninguna bloqueante para la fase 1~~ — **DEC-053 (Fase 10) confirma: sin base
+de datos en esta fase, JSON Lines append-only.**
 
 ---
 

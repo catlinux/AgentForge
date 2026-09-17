@@ -2,10 +2,21 @@
  * in CI/tests: no `console.*` calls exist in this module tree. */
 export const MAX_OUTPUT_BYTES = 64 * 1024; // 64 KiB per stream
 
-export function truncateOutput(chunks: readonly Buffer[]): string {
+export interface TruncatedOutput {
+  readonly text: string;
+  /** Structural flag (Fase 10, DEC-055): whether the limit was exceeded. Determined from the
+   * actual byte length, never inferred later by searching output content — avoids both content
+   * inspection and false positives if real output happened to contain the truncation marker. */
+  readonly truncated: boolean;
+}
+
+export function truncateOutput(chunks: readonly Buffer[]): TruncatedOutput {
   const combined = Buffer.concat(chunks);
   if (combined.length <= MAX_OUTPUT_BYTES) {
-    return combined.toString("utf-8");
+    return { text: combined.toString("utf-8"), truncated: false };
   }
-  return combined.subarray(0, MAX_OUTPUT_BYTES).toString("utf-8") + "\n...[truncated]";
+  return {
+    text: combined.subarray(0, MAX_OUTPUT_BYTES).toString("utf-8") + "\n...[truncated]",
+    truncated: true,
+  };
 }

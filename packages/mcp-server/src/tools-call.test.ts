@@ -44,7 +44,14 @@ function makeDeps(overrides: Partial<ToolsCallDeps> = {}): ToolsCallDeps {
       async () =>
         ({
           ok: true,
-          outcome: { kind: "executed", exitCode: 0, stdout: "ok", stderr: "" },
+          outcome: {
+            kind: "executed",
+            exitCode: 0,
+            stdout: "ok",
+            stderr: "",
+            stdoutTruncated: false,
+            stderrTruncated: false,
+          },
         }) as ExecutionChannelResponse,
     ),
     cancel: vi.fn(async () => undefined),
@@ -102,7 +109,14 @@ describe("handleToolCall (DEC-045)", () => {
 
     resolveRequest({
       ok: true,
-      outcome: { kind: "executed", exitCode: 0, stdout: "", stderr: "" },
+      outcome: {
+        kind: "executed",
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        stdoutTruncated: false,
+        stderrTruncated: false,
+      },
     });
     await callPromise;
   });
@@ -125,7 +139,17 @@ describe("handleToolCall (DEC-045)", () => {
         request: vi.fn(async (): Promise<ExecutionChannelResponse> => {
           await new Promise((r) => setTimeout(r, 200));
           requestResolved = true;
-          return { ok: true, outcome: { kind: "executed", exitCode: 0, stdout: "", stderr: "" } };
+          return {
+            ok: true,
+            outcome: {
+              kind: "executed",
+              exitCode: 0,
+              stdout: "",
+              stderr: "",
+              stdoutTruncated: false,
+              stderrTruncated: false,
+            },
+          };
         }),
         cancel: vi.fn(async () => undefined),
         close: vi.fn(async () => undefined),
@@ -143,6 +167,8 @@ describe("handleToolCall (DEC-045)", () => {
       "host-1",
       {},
       fingerprint,
+      sessionId,
+      expect.any(String),
     );
   });
 
@@ -180,7 +206,17 @@ describe("handleToolCall (DEC-045)", () => {
         connect: vi.fn(async () => undefined),
         request: vi.fn(async (req: ExecutionChannelRequest): Promise<ExecutionChannelResponse> => {
           captured = req;
-          return { ok: true, outcome: { kind: "executed", exitCode: 0, stdout: "", stderr: "" } };
+          return {
+            ok: true,
+            outcome: {
+              kind: "executed",
+              exitCode: 0,
+              stdout: "",
+              stderr: "",
+              stdoutTruncated: false,
+              stderrTruncated: false,
+            },
+          };
         }),
         cancel: vi.fn(async () => undefined),
         close: vi.fn(async () => undefined),
@@ -199,7 +235,17 @@ describe("handleToolCall (DEC-045)", () => {
         connect: vi.fn(async () => undefined),
         request: vi.fn(async (req: ExecutionChannelRequest): Promise<ExecutionChannelResponse> => {
           captured = req;
-          return { ok: true, outcome: { kind: "executed", exitCode: 0, stdout: "", stderr: "" } };
+          return {
+            ok: true,
+            outcome: {
+              kind: "executed",
+              exitCode: 0,
+              stdout: "",
+              stderr: "",
+              stdoutTruncated: false,
+              stderrTruncated: false,
+            },
+          };
         }),
         cancel: vi.fn(async () => undefined),
         close: vi.fn(async () => undefined),

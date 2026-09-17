@@ -472,7 +472,18 @@ remain explicit future work.
 
 ## 12. Audit and observability
 
-**PROPOSAL** (already sketched in Phase 0, refined with Phase 0.7 findings):
+**DECISION (DEC-052 to DEC-057, Phase 10):** writing architecture, persistence format, event
+model, data minimization, identifier propagation, and guarantees are already decided — see
+`decisions/DECISIONS.md`. Summary: each process (MCP server, Execution) writes its own events
+autonomously, no dedicated new component; append-only JSON Lines file per writing process; a new
+`operationId`, unique per `tools/call` invocation, explicitly distinct from `SessionId` (Phase 9)
+and from `OperationHash` (DEC-038, which can repeat across invocations sharing the same
+arguments), propagated to Execution and to the cancellation contract; strict minimization (never
+secrets/keys/passphrases/full stdout-stderr/raw parameters/resolved command text/hostname-username/
+raw library errors); best-effort persistence, never blocking or gating the real operation it
+describes.
+
+**PROPOSAL (historical context, Phase 1 — see DEC-052 to DEC-057 above for what is now decided):**
 
 - Minimum fields per record: full resolved command, target host, tool/operation name, parameters
   supplied by the LLM, timestamp, duration, exit code, a reference to truncated/hashed output,
@@ -491,10 +502,8 @@ remain explicit future work.
   autonomously" and "the human explicitly approved it" — relevant for forensic reconstruction in
   case of an incident.
 
-**OPEN QUESTION:** exact format/storage (local JSON Lines file vs. SQLite vs. other) — depends on
-the technology stack (§17). **Preliminary PROPOSAL:** start with an append-only JSON Lines file
-(simple, no dependencies, easy to inspect manually), migrate to queryable storage (SQLite) if
-volume or query needs justify it.
+~~**OPEN QUESTION:** exact format/storage (local JSON Lines file vs. SQLite vs. other)~~ —
+**resolved in Phase 10, see DEC-053.**
 
 ---
 
@@ -510,8 +519,8 @@ volume or query needs justify it.
   to SQLite (embedded, no additional server infrastructure, consistent with `README.md`'s
   local-first principle) before a database engine with its own server.
 
-**OPEN QUESTION:** none blocking for phase 1 — this decision can be postponed without conditioning
-the rest of the architecture.
+~~**OPEN QUESTION:** none blocking for phase 1~~ — **DEC-053 (Phase 10) confirms: no database in
+this phase, append-only JSON Lines.**
 
 ---
 

@@ -2,6 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type {
+  AuditWriter,
   DiscoveredToolView,
   ExecutionChannelClient,
   PolicyDecision,
@@ -19,6 +20,8 @@ export interface McpServerDeps {
   readonly executionClient: ExecutionChannelClient;
   readonly resolveHostId: (args: Readonly<Record<string, unknown>>) => string;
   readonly progressIntervalMs: number;
+  /** Optional (DEC-052/057): best-effort audit writer for this process's own events. */
+  readonly auditWriter?: AuditWriter;
 }
 
 /**
@@ -71,6 +74,7 @@ export function createMcpServer(deps: McpServerDeps): Server {
       },
       cancelled: extra.signal,
       progressIntervalMs: deps.progressIntervalMs,
+      ...(deps.auditWriter !== undefined ? { auditWriter: deps.auditWriter } : {}),
     });
 
     return {

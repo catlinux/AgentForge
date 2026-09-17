@@ -1073,6 +1073,166 @@ Format per a cada decisió futura:
 - Consecuencias: ninguna nueva; refuerza el patrón ya establecido de no crear estructura sin razón
   concreta.
 
+## DEC-052 — Arquitectura de escritura del Audit Log (Fase 10)
+
+- Fecha: 2026-09-17
+- Contexto: había que decidir quién genera y persiste los eventos de auditoría entre los dos
+  procesos ya existentes (servidor MCP, Execution), sin asumir que uno de ellos deba escribir
+  todo. Se analizaron 4 alternativas: MCP único escritor, Execution único escritor, cada proceso
+  escribe sus propios eventos correlacionados después, y un proceso/componente dedicado nuevo.
+- Opciones consideradas: (1) MCP como único escritor — pierde eventos si MCP cae antes de recibir
+  el resultado de Execution; (2) Execution como único escritor — pierde eventos que ocurren antes
+  de contactar a Execution (p. ej. "Unknown tool"); (3) cada proceso escribe sus propios eventos,
+  correlacionados por identificadores comunes; (4) proceso dedicado nuevo — requeriría un tercer
+  canal IPC sin ninguna frontera de seguridad que lo justifique.
+- Decisión: **(3)**. El servidor MCP escribe los eventos de lo que ocurre antes o fuera de su
+  contacto con Execution (invocación, decisión de política, cancelaciones del lado cliente,
+  fallos de IPC/disponibilidad); Execution escribe los eventos de lo que ocurre una vez que la
+  petición le llega (confirmación, resultado real de SSH, incluidas ejecuciones que continúan
+  pese a cancelación tardía). Sin proceso/componente dedicado nuevo.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: dos flujos/ficheros de escritura en vez de uno; requiere que ambos procesos
+  compartan el modelo de eventos desde `packages/shared`, incluidos los identificadores de
+  correlación `sessionId` y `operationId` (ver DEC-054/DEC-056) para que la separación de
+  escritores no rompa la trazabilidad de una misma operación.
+
+## DEC-053 — Formato y ubicación de persistencia del Audit Log (Fase 10)
+
+- Fecha: 2026-09-17
+- Contexto: `architecture/ARCHITECTURE.md` §12/§13 dejaron como PROPOSAL/OPEN QUESTION (Fase 1) el
+  formato de almacenamiento del Audit Log, pospuesta hasta que el stack tecnológico y el volumen
+  real lo determinaran. Se comparó JSON Lines append-only frente a SQLite.
+- Opciones consideradas: (A) JSON Lines append-only, un fichero por proceso escritor; (B) SQLite.
+- Decisión: **(A)**. Fichero JSON Lines append-only por proceso escritor (servidor MCP,
+  Execution), con permisos restringidos al usuario de SO del proceso que escribe.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, tras comparación explícita de
+  simplicidad, dependencias, atomicidad, concurrencia, corrupción, recuperación, consultas,
+  rotación, rendimiento, inspección manual, comportamiento en Windows/Linux y mantenimiento).
+- Consecuencias: evita el riesgo ya demostrado de dependencias nativas con problemas de
+  compilación en Windows (`ssh2`/`cpu-features`, Fase 7). "Registro consultable" (ROADMAP.md) se
+  interpreta en esta fase como filtrable/correlacionable por herramientas externas simples
+  (`jq`, `grep`, scripts), no como base de datos indexada — una migración a SQLite queda como
+  evolución futura explícita si el volumen o la necesidad de consulta real lo demuestran, mismo
+  criterio ya previsto en la PROPOSAL heredada de Fase 1.
+
+## DEC-054 — Modelo de eventos, `operationId` y su propagación (Fase 10)
+
+- Fecha: 2026-09-17
+- Contexto: se necesitaba un identificador que cubriera el 100% de las invocaciones `tools/call`
+  (`allow`, `deny`, `requires-confirmation` con cualquier resolución, `cancelled`, `timeout`,
+  `failed`), a diferencia de `OperationHash` (DEC-038), que solo existe para operaciones que pasan
+  por confirmación y que, por diseño, puede repetirse entre invocaciones distintas con exactamente
+  los mismos argumentos (no identifica "esta invocación concreta en el tiempo", identifica una
+  tupla de contrato). Un análisis posterior detectó que, sin propagar este identificador a
+  Execution, la correlación de eventos generados en ese proceso (confirmación, resultado de SSH)
+  no sería posible en varios casos reales (confirmación, cancelación durante confirmación, SSH
+  timeout/failure, ejecución que continúa tras cancelación tardía).
+- Opciones consideradas: reutilizar `OperationHash` como identificador general de auditoría
+  (descartada — semántica distinta, puede repetirse entre invocaciones, mezclarla rompería el
+  propósito de seguridad original de DEC-038); derivar un identificador de la tupla ya usada en
+  cancelación (descartada — no resuelve la ambigüedad de invocaciones repetidas con los mismos
+  argumentos); `operationId` nuevo, opaco, generado por el servidor MCP una vez por invocación,
+  propagado explícitamente a Execution y al contrato de cancelación.
+- Decisión: **`operationId` nuevo**, con las siguientes características:
+  1. Generado por el servidor MCP, una vez por cada invocación real de `tools/call`,
+     independientemente de cómo termine.
+  2. Distinto y no derivable de `SessionId` (agrupa todas las operaciones de una misma instancia
+     del servidor MCP, vive más tiempo que una sola invocación) ni de `OperationHash`
+     (determinista sobre `(identity, parameters, hostId, schemaFingerprint)`, solo existe para
+     operaciones con confirmación, puede repetirse entre invocaciones distintas).
+  3. Se propaga a Execution mediante un nuevo campo en `ExecutionRequest`
+     (`packages/shared/src/execution/request.ts`) y en `ExecutionChannelRequest`
+     (`packages/shared/src/mcp/execution-channel.ts`), junto a `sessionId` — ambos como metadatos
+     de correlación, sin participar en `resolveCommandTemplate`, `evaluate()`,
+     `confirmOperation()` ni `executeOverSsh()`.
+  4. Se propaga también en el contrato/mensaje de cancelación (`ExecutionChannelClient.cancel()`
+     y el mensaje `{kind:"cancel", ...}` de `execution-server.ts`), como campo adicional — sin
+     modificar los campos que `cancelOperation()`/`computeOperationHash()` ya usan para su lógica
+     real, que permanecen exactamente como están.
+  5. El evento `tool-invoked` se corrige para reflejar solo lo realmente disponible en el momento
+     en que se genera (antes de `resolveToolEntry()`): `operationId`, `sessionId`, `mcpToolName`
+     (nombre crudo tal como lo envió el cliente MCP, sin garantía de que corresponda a una tool
+     real), `hostId` (ya resuelto en `server.ts` antes de invocar `handleToolCall`), y los
+     **nombres** de las claves de los argumentos recibidos (nunca sus valores). No incluye
+     `ToolIdentity` (no existe todavía en ese punto del código) ni asume parámetros validados (la
+     validación real ocurre después, en Execution, DEC-037) — `ToolIdentity` aparece con garantía
+     a partir del evento que registra el resultado de `evaluate()`.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa, tras análisis explícito de la
+  inconsistencia detectada entre el modelo de eventos y la propagación real de identificadores en
+  el código, verificado contra `tools-call.ts`/`execution-server.ts`/`execution-channel.ts`).
+- Consecuencias: `ExecutionRequest`, `ExecutionChannelRequest` y el contrato de cancelación quedan
+  ampliados con un campo `operationId` cada uno; ningún cambio a `hash-registry.ts`,
+  `operation-hash.ts`, `confirm.ts` ni `cancel.ts` en su lógica interna — solo se añade un dato
+  que esos módulos nunca leen ni usan. No reabre ni modifica DEC-038/DEC-045.
+
+## DEC-055 — Minimización de datos en el Audit Log (Fase 10)
+
+- Fecha: 2026-09-17
+- Contexto: había que definir explícitamente qué información puede registrarse y cuál debe quedar
+  fuera, para que el Audit Log permita auditabilidad sin convertirse en un canal de fuga de
+  información sensible (secretos, claves SSH, contenido de ejecución, etc.).
+- Opciones consideradas: registrar contenido completo con control de acceso al propio log
+  (descartada — no existe hoy mecanismo de control de acceso granular que lo justifique);
+  minimización explícita por campo, con identificadores/metadatos en vez de contenido crudo.
+- Decisión: reglas explícitas de minimización:
+  - **Nunca:** claves privadas SSH, passphrases, cualquier `SecretRecord.payload`, mensajes de
+    error crudos de librerías internas (`ssh2`, `node:net`, etc.).
+  - **Solo como metadato, nunca contenido:** `stdout`/`stderr` (longitud en bytes y si hubo
+    truncado, nunca el contenido); comando resuelto (hash opcional, nunca el texto).
+  - **Solo nombres, nunca valores:** parámetros de invocación (nombres de las claves suministradas,
+    nunca sus valores).
+  - **Excluidos en favor de referencias opacas:** `hostname`/`username` de conexión SSH (se usa
+    `hostId`, no el detalle de conexión real).
+  - **Siempre permitidos (no son secretos, son identificadores de correlación):** `SessionId`,
+    `operationId`, `ToolIdentity`, `hostId`.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: la reconstrucción forense se apoya en identificadores/metadatos/hashes, no en
+  contenido crudo — límite aceptado explícitamente. Extiende al resto de campos el mismo
+  principio ya aplicado en DEC-040 (stdout/stderr) y en el diseño general de Secrets Broker
+  (DEC-030).
+
+## DEC-056 — Propagación conjunta de `sessionId` y `operationId` a Execution (Fase 10)
+
+- Fecha: 2026-09-17
+- Contexto: `sessionId` (Fase 9, DEC-048 a DEC-051) y `operationId` (DEC-054) tienen el mismo
+  propósito (metadato de correlación para el Audit Log) y debían propagarse de forma consistente,
+  no uno sí y el otro no, evitando repetir parches sucesivos sobre los mismos tipos.
+- Opciones consideradas: propagar solo `sessionId` (insuficiente, ver DEC-054 — no permite
+  correlacionar por invocación concreta); propagar solo `operationId` sin `sessionId` (perdería la
+  agrupación por sesión ya construida en Fase 9); propagar ambos juntos como el mismo cambio de
+  código.
+- Decisión: **ambos identificadores se propagan juntos**, en el mismo cambio, a través de:
+  `ExecutionRequest`, `ExecutionChannelRequest`, y el contrato/mensaje de cancelación —
+  `execution-server.ts::handleLine` deja de descartar `sessionId` (como hacía hasta ahora) y hace
+  lo mismo con `operationId`.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias — **aislamiento explícito**: ni `sessionId` ni `operationId` participan jamás en
+  la lógica de `evaluate()`/`PolicyApprovalStore` (Policy Engine, DEC-023/026/027), en
+  `OperationHashRegistry`/`computeOperationHash()`/`confirmOperation()`/`cancelOperation()`
+  (DEC-038/045), ni en la resolución de la plantilla de comando o la ejecución SSH real
+  (DEC-037/041). Son metadatos que viajan junto a la lógica real de la operación, nunca dentro de
+  ella. No reabre DEC-038/DEC-045; es aditiva sobre DEC-047 y extiende el principio ya fijado en
+  DEC-049.
+
+## DEC-057 — Garantías de persistencia del Audit Log (Fase 10)
+
+- Fecha: 2026-09-17
+- Contexto: había que decidir si un fallo de escritura de un evento de auditoría debía afectar a
+  la operación real que describe, y si el Audit Log debía tratarse como una garantía de seguridad
+  o como evidencia complementaria.
+- Opciones consideradas: escritura síncrona bloqueante que aborte la operación si falla (descartada
+  explícitamente — invertiría la relación evidencia/control, convirtiendo el Audit Log en una
+  superficie de denegación de servicio sobre el propio sistema); escritura best effort, sin
+  bloquear ni condicionar la operación real.
+- Decisión: **best effort**. Un fallo de escritura de un evento de auditoría nunca aborta,
+  revierte, ni condiciona una operación real; Policy Engine y Execution mantienen su
+  comportamiento actual sin depender del éxito de ninguna escritura de auditoría.
+- Aprobado por: usuario (2026-09-17, vía respuesta directa).
+- Consecuencias: es posible que una operación quede parcialmente registrada en casos extremos
+  (proceso terminado abruptamente) — aceptado como límite conocido y documentado, no oculto.
+  Coherente con DEC-027 (Policy Engine no depende del Audit Log para su propia lógica). El Audit
+  Log es evidencia persistente, nunca un mecanismo de control de ejecución.
+
 ---
 
 ## PENDIENTE — decisiones abiertas que requieren autorización explícita del usuario
@@ -1134,6 +1294,12 @@ apruebe, debe moverse arriba como `DEC-XXX` con el formato correspondiente.
 - ~~Modelo de sesión: identificador ligero, no entidad (Fase 9)~~ → DEC-049.
 - ~~Origen del SessionId (Fase 9)~~ → DEC-050.
 - ~~Ubicación del tipo SessionId (Fase 9)~~ → DEC-051.
+- ~~Arquitectura de escritura del Audit Log (Fase 10)~~ → DEC-052.
+- ~~Formato y ubicación de persistencia del Audit Log (Fase 10)~~ → DEC-053.
+- ~~Modelo de eventos, operationId y su propagación (Fase 10)~~ → DEC-054.
+- ~~Minimización de datos en el Audit Log (Fase 10)~~ → DEC-055.
+- ~~Propagación conjunta de sessionId y operationId a Execution (Fase 10)~~ → DEC-056.
+- ~~Garantías de persistencia del Audit Log (Fase 10)~~ → DEC-057.
 
 **Genuinamente pendientes** (no bloqueantes para cerrar la Fase 1; trasladadas a considerar
 durante la Fase 2 o cuando corresponda):

@@ -49,7 +49,17 @@ function makeDeps(captured: ExecutionChannelRequest[]): McpServerDeps {
     connect: vi.fn(async () => undefined),
     request: vi.fn(async (req: ExecutionChannelRequest): Promise<ExecutionChannelResponse> => {
       captured.push(req);
-      return { ok: true, outcome: { kind: "executed", exitCode: 0, stdout: "ok", stderr: "" } };
+      return {
+        ok: true,
+        outcome: {
+          kind: "executed",
+          exitCode: 0,
+          stdout: "ok",
+          stderr: "",
+          stdoutTruncated: false,
+          stderrTruncated: false,
+        },
+      };
     }),
     cancel: vi.fn(async () => undefined),
     close: vi.fn(async () => undefined),

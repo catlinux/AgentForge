@@ -7,6 +7,8 @@ export interface SshExecResult {
   readonly exitCode: number;
   readonly stdout: string;
   readonly stderr: string;
+  readonly stdoutTruncated: boolean;
+  readonly stderrTruncated: boolean;
 }
 
 /**
@@ -63,10 +65,14 @@ export function executeOverSsh(
               exitCode = code;
               finish(() => {
                 conn.end();
+                const stdout = truncateOutput(stdoutChunks);
+                const stderr = truncateOutput(stderrChunks);
                 resolve({
                   exitCode,
-                  stdout: truncateOutput(stdoutChunks),
-                  stderr: truncateOutput(stderrChunks),
+                  stdout: stdout.text,
+                  stderr: stderr.text,
+                  stdoutTruncated: stdout.truncated,
+                  stderrTruncated: stderr.truncated,
                 });
               });
             })

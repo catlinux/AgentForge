@@ -20,7 +20,7 @@ decisiones de arquitectura que todavía están abiertas.
 | 7 | Ejecución remota / SSH | **En curso** — 6 decisiones aprobadas (DEC-037 a DEC-042) |
 | 8 | Integración MCP | **En curso** — 5 decisiones aprobadas (DEC-043 a DEC-047) |
 | 9 | Sessions | **En curso** — 4 decisiones aprobadas (DEC-048 a DEC-051) |
-| 10 | Audit Log | Propuesta, no iniciada |
+| 10 | Audit Log | **En curso** — 6 decisiones aprobadas (DEC-052 a DEC-057) |
 | 11 | Connectors | Propuesta, no iniciada |
 | 12 | Dashboard Web | Propuesta, no iniciada |
 | 13 | Hardening de seguridad | Propuesta, no iniciada |
@@ -120,7 +120,13 @@ de ellas.
   entidad; generado por el propio servidor MCP (no derivado del SDK — `StdioServerTransport` no
   expone `sessionId` de transporte, verificado técnicamente); tipo en `packages/shared`, sin
   paquete ni proceso propio.
-- **Fase 10 — Audit Log**: registro centralizado y consultable de todas las acciones.
+- **Fase 10 — Audit Log**: registro centralizado y consultable de todas las acciones. 6 decisiones
+  aprobadas (DEC-052 a DEC-057, ver `decisions/DECISIONS.md`): cada proceso (servidor MCP,
+  Execution) escribe sus propios eventos, sin componente dedicado nuevo; JSON Lines append-only,
+  un fichero por proceso escritor; `operationId` nuevo por invocación (distinto de `SessionId` y
+  de `OperationHash`), propagado a Execution y a cancelación; minimización estricta de datos
+  (nunca secretos/claves/stdout-stderr completos/parámetros en bruto); persistencia best effort,
+  nunca bloqueante ni condicionante de la operación real.
 - **Fase 11 — Connectors**: integraciones concretas con servicios externos (GitHub, Dropbox, etc.),
   solo tras autorización explícita.
 - **Fase 12 — Dashboard Web**: interfaz de administración/visualización.

@@ -3,7 +3,9 @@ import type {
   ExecutionChannelClient,
   ExecutionChannelRequest,
   ExecutionChannelResponse,
+  OperationId,
   SchemaFingerprint,
+  SessionId,
   ToolIdentity,
 } from "@agentforge/shared";
 
@@ -75,13 +77,23 @@ export class NetExecutionChannelClient implements ExecutionChannelClient {
     hostId: string,
     parameters: Readonly<Record<string, string>>,
     schemaFingerprint: SchemaFingerprint,
+    sessionId: SessionId,
+    operationId: OperationId,
   ): Promise<void> {
     const socket = this.socket;
     if (socket === undefined) {
       return;
     }
     socket.write(
-      `${JSON.stringify({ kind: "cancel", identity, hostId, parameters, schemaFingerprint })}\n`,
+      `${JSON.stringify({
+        kind: "cancel",
+        identity,
+        hostId,
+        parameters,
+        schemaFingerprint,
+        sessionId,
+        operationId,
+      })}\n`,
     );
   }
 

@@ -1,6 +1,7 @@
 # STATE.md — AgentForge
 
-**Última actualización:** 2026-09-16 (fin de la Fase 0.5)
+**Última actualización:** 2026-09-17 (Fase 10 — Audit Log, EXECUTE+VERIFY completados, pendiente
+de autorización de commit y push)
 
 ## Proyecto
 
@@ -12,23 +13,33 @@ copiar).
 
 ## Fase actual
 
-**Fase 9 — Sessions**
+**Fase 10 — Audit Log**
 
-**Estado:** COMPLETADA (2026-09-17) — 4 decisiones aprobadas (DEC-048 a DEC-051: alcance
-single-user/single-agent sin reabrir DEC-047; `SessionId` como identificador ligero de
-correlación, sin fusionar los registros ya existentes de Policy Engine/Execution bajo una
-entidad; generado por el propio servidor MCP al arrancar, no derivado del SDK MCP —verificado
-técnicamente que `StdioServerTransport` nunca expone `sessionId` de transporte—; tipo en
-`packages/shared`, sin paquete ni proceso propio). Implementación completa con tests. Ver
-`decisions/DECISIONS.md` para el registro formal.
+**Estado:** EXECUTE + VERIFY completados (2026-09-17) — 6 decisiones aprobadas (DEC-052 a
+DEC-057: cada proceso, MCP server y Execution, escribe sus propios eventos de forma autónoma sin
+componente/proceso dedicado nuevo; persistencia JSON Lines append-only, un fichero por proceso,
+permisos `0o600`, sin SQLite por riesgo de dependencia nativa ya demostrado en Fase 7; modelo
+`operationId` nuevo y distinto de `SessionId`/`OperationHash`, único por invocación de
+`tools/call`, generado una vez por el servidor MCP; minimización estricta de datos (nunca
+secretos, contenido de stdout/stderr, valores de parámetros, hostname/username); `sessionId` y
+`operationId` propagados juntos a través de `ExecutionRequest`/`ExecutionChannelRequest`/contrato
+de cancelación, sin tocar Policy Engine, `OperationHashRegistry` ni la lógica de ejecución;
+Audit Log best-effort y no bloqueante — un fallo de escritura nunca aborta ni condiciona la
+operación real). Ver `decisions/DECISIONS.md` para el registro formal.
 
-**Implementación:** `SessionId` generado una vez por instancia del servidor MCP (`generateSessionId`,
-UUID), propagado como metadato de correlación en `ExecutionChannelRequest` (contrato de dominio
-de DEC-047) — nunca usado por Policy Engine ni por los registros de aprobación/confirmación ya
-existentes, que permanecen exactamente como estaban. **Ningún sistema remoto real tocado**, ningún
-despliegue externo. Fases 3 a 8 siguen vigentes y sin cambios estructurales (solo se amplió el
-contrato `ExecutionChannelRequest` con el campo `sessionId` y su propagación en
-`server.ts`/`tools-call.ts` del servidor MCP).
+**Implementación:** módulo `packages/shared/src/audit/` (`OperationId`/`generateOperationId`,
+modelo de eventos `AuditEvent`/`AuditEventInput`, `AuditWriter` JSON Lines best-effort);
+`ExecutionRequest`/`ExecutionChannelRequest` y el contrato de cancelación (`ExecutionChannelClient
+.cancel()`) ampliados con `sessionId`+`operationId`; `tools-call.ts` genera el `operationId` y
+escribe `tool-invoked`/`policy-decided`/`operation-cancelled`/`execution-completed`
+(caso IPC no disponible); `execution-server.ts` recibe `sessionId`/`operationId` (antes se
+descartaba `sessionId` silenciosamente — corregido) y escribe `confirmation-resolved` (en
+cancelación) y `execution-completed`. Extensión estructural mínima y explícitamente autorizada de
+Fase 7: `truncated: boolean` en `TruncatedOutput`/`ExecutionOutcome`/`SshExecResult`, sustituyendo
+un heurístico frágil de búsqueda de texto por un dato estructural ya calculado — sin cambiar
+límites ni comportamiento de truncamiento SSH. **Ningún sistema remoto real tocado**, ningún
+despliegue externo. Fases 3 a 9 siguen vigentes; el único cambio sobre tipos ya cerrados es la
+ampliación estructural de Fase 7 descrita arriba, explícitamente autorizada durante EXECUTE.
 
 **Investigación:** Fases 0, 0.7 completadas. Fase 0.5 (gobernanza) completada.
 
@@ -38,14 +49,15 @@ DEC-017) + TOOL DISCOVERY APROBADO E IMPLEMENTADO (Fase 4: DEC-018 a DEC-022) + 
 APROBADO E IMPLEMENTADO (Fase 5: DEC-023 a DEC-029) + SECRETS BROKER APROBADO E IMPLEMENTADO
 (Fase 6: DEC-030 a DEC-036) + EJECUCIÓN REMOTA/SSH APROBADA E IMPLEMENTADA (Fase 7: DEC-037 a
 DEC-042) + INTEGRACIÓN MCP APROBADA E IMPLEMENTADA (Fase 8: DEC-043 a DEC-047) + SESSIONS
-APROBADAS E IMPLEMENTADAS (Fase 9: DEC-048 a DEC-051). Resto documentado como PROPOSAL/OPEN
-QUESTION en `architecture/ARCHITECTURE.md` §20.
+APROBADAS E IMPLEMENTADAS (Fase 9: DEC-048 a DEC-051) + AUDIT LOG APROBADO E IMPLEMENTADO
+(Fase 10: DEC-052 a DEC-057). Resto documentado como PROPOSAL/OPEN QUESTION en
+`architecture/ARCHITECTURE.md` §20.
 
 ## Microtarea actual
 
-Fase 9 cerrada, pendiente de verificación final y de autorización de commit+push. Siguiente paso
-tras el cierre: presentar el resumen de objetivos y decisiones a analizar de la Fase 10 (Audit
-Log) — sin implementar nada todavía.
+Fase 10 con EXECUTE y VERIFY completos, pendiente de presentar el resultado de VERIFY al usuario
+y de autorización explícita y separada de `git commit` y `git push` (todavía no solicitadas ni
+concedidas para esta fase).
 
 ## Trabajo completado
 
@@ -651,6 +663,74 @@ decisión automática.
       confirma que Policy Engine, Execution (salvo el contrato ya ampliado en Fase 8) y Secrets
       Broker no fueron tocados.
 
+### Fase 10 — Audit Log (EXECUTE + VERIFY completados, 2026-09-17)
+- [x] INSPECT (12 secciones) → PLAN (arquitectura, persistencia, modelo de eventos, propagación
+      de `sessionId`/flujo completo/atomicidad/rotación/impacto en código) → ronda de corrección
+      crítica del PLAN por el usuario (4 puntos: inconsistencia `operationId`↔Execution;
+      cancelación y `operationId`; campos reales disponibles en `tool-invoked`; correlación en
+      todos los casos incluida cancelación en sus 3 fases) → DEC-052 a DEC-057 aprobadas como
+      conjunto → EXECUTE.
+- [x] **DEC-052** — Cada proceso (MCP server, Execution) escribe sus propios eventos de forma
+      autónoma; sin proceso/componente dedicado nuevo (mismo criterio aplicado en DEC-017/022/
+      029/044/051).
+- [x] **DEC-053** — Persistencia JSON Lines append-only, un fichero por proceso escritor,
+      permisos `0o600`; SQLite descartado por riesgo de dependencia nativa (ya materializado con
+      `ssh2`/`cpu-features` en Fase 7 en esta máquina Windows).
+- [x] **DEC-054** — `operationId` nuevo, distinto de `SessionId` y de `OperationHash`: único por
+      invocación de `tools/call` (no por argumentos), generado una vez por el servidor MCP,
+      independiente del resultado. `tool-invoked` corregido para incluir solo lo verificado como
+      disponible antes de `resolveToolEntry()`: `mcpToolName`, `hostId`, `parameterNames` (nunca
+      `ToolIdentity`, que todavía no existe en ese punto, ni valores de parámetros).
+- [x] **DEC-055** — Minimización estricta: nunca secretos/claves SSH/passphrases/errores internos
+      de librerías; stdout/stderr y comando resuelto nunca como contenido; parámetros solo como
+      nombres de clave; hostname/username excluidos en favor de `hostId` opaco.
+- [x] **DEC-056** — `sessionId` **y** `operationId` propagados juntos a través de
+      `ExecutionRequest`, `ExecutionChannelRequest` y el contrato de cancelación — corrección
+      respecto al PLAN inicial (que solo proponía `sessionId`), verificada contra el código real
+      del cliente/servidor de Execution antes de aprobarse; Policy Engine, `OperationHashRegistry`
+      y la lógica de ejecución no se tocan.
+- [x] **DEC-057** — Audit Log best-effort y no bloqueante: un fallo de escritura nunca aborta,
+      revierte ni condiciona la operación real — es evidencia, no mecanismo de control.
+- [x] Implementación: `packages/shared/src/audit/` (`operation-id.ts`, `event.ts` con el tipo
+      distributivo `AuditEventInput` sobre la unión discriminada `AuditEvent`, `writer.ts` con
+      `AuditWriter`, `index.ts`); `ExecutionRequest`/`ExecutionChannelRequest` ampliados con
+      `sessionId`+`operationId`; `ExecutionChannelClient.cancel()` ampliado a 6 parámetros;
+      `tools-call.ts` genera `operationId` y escribe `tool-invoked`/`policy-decided`/
+      `operation-cancelled` (fases `before-execution`/`during-confirmation`/
+      `after-authorization`)/`execution-completed` (caso `execution-unavailable`);
+      `execution-server.ts` ahora usa `sessionId`/`operationId` recibidos (antes `sessionId` se
+      descartaba silenciosamente al llamar a `execute()` — corregido como parte de esta fase) y
+      escribe `confirmation-resolved` (razón `cancelled`) y `execution-completed`.
+- [x] **Decisión de diseño no contemplada, consultada durante EXECUTE (según lo pactado):**
+      detectado heurístico frágil (`stdout.includes("[truncated]")`) para poblar
+      `outputTruncated`, en tensión con DEC-055 y propenso a falsos positivos. Presentado al
+      usuario antes de implementar; **autorizado** añadir un campo estructural mínimo
+      `truncated: boolean` a los tipos ya cerrados de Fase 7 (`TruncatedOutput` en
+      `output-limits.ts`, `ExecutionOutcome`, `SshExecResult`), sin cambiar límites ni
+      comportamiento de truncamiento SSH, documentado explícitamente como ampliación estructural
+      del contrato de Fase 7, no como cambio de política — tests de Fase 7 y Fase 10 actualizados
+      en consecuencia.
+- [x] Tests (Vitest) nuevos: `operation-id.test.ts` (2), `writer.test.ts` (3: escritura JSON
+      Lines válida con `eventId`/`timestamp` generados, permisos `0o600` en POSIX, no-throw ante
+      ruta no escribible — DEC-057); `output-limits.test.ts` reescrito para el nuevo shape
+      `{text, truncated}` con un test explícito de que `truncated` se deriva de longitud en bytes,
+      nunca de búsqueda de texto; actualizados `execute.test.ts`,
+      `execution-client.test.ts`/`server.test.ts`/`tools-call.test.ts` del servidor MCP para los
+      nuevos campos obligatorios (`operationId`, `stdoutTruncated`/`stderrTruncated`) y la nueva
+      firma de `cancel()`.
+- [x] Alcance respetado: no se reabrió ninguna decisión previa salvo la ampliación estructural de
+      Fase 7 explícitamente autorizada; `OperationHash`/`OperationHashRegistry`/Policy Engine sin
+      tocar; `operationId` no participa en autorización, confirmación ni ejecución; sin
+      dependencias nuevas.
+- [x] **Verificado:** `pnpm run typecheck` correcto en los 5 paquetes; `pnpm run lint` sin
+      errores; `pnpm run format` correcto (tras `--write` sobre 2 ficheros); `pnpm run test` —
+      144/146 correctos (2 tests de permisos POSIX omitidos en Windows, heredados de Fase 6),
+      incluidos 5 tests nuevos de auditoría; `pnpm run build` correcto en los 5 paquetes; `pnpm
+      install --frozen-lockfile` correcto (sin dependencias nuevas); grep de secretos/`console.*`
+      sobre el diff y sobre `packages/shared/src/audit/` sin coincidencias; `git status` revisado
+      en su totalidad. **Pendiente:** autorización explícita y separada de `git commit` y de
+      `git push` — todavía no concedidas para esta fase.
+
 ## Documentación sincronizada
 
 - `README.md` / `README.en.md`: contenido equivalente en ambos idiomas, verificado al redactarlos
@@ -738,6 +818,16 @@ No se han detectado contradicciones de contenido técnico entre los documentos d
   Engine/Execution.
 - **DEC-050** — Origen: generado por el servidor MCP, no derivado del SDK (verificado técnicamente).
 - **DEC-051** — Ubicación: `packages/shared`, sin paquete ni proceso propio.
+- **DEC-052** — Escritura de Audit Log: cada proceso escribe sus propios eventos, sin componente
+  ni proceso dedicado nuevo.
+- **DEC-053** — Persistencia: JSON Lines append-only, un fichero por proceso, permisos `0o600`,
+  sin SQLite.
+- **DEC-054** — Modelo `operationId`: nuevo, único por invocación, distinto de `SessionId` y de
+  `OperationHash`.
+- **DEC-055** — Minimización estricta de datos en cada evento de auditoría.
+- **DEC-056** — `sessionId` y `operationId` propagados juntos a Execution y al contrato de
+  cancelación.
+- **DEC-057** — Audit Log best-effort y no bloqueante: nunca condiciona la operación real.
 
 Ver `decisions/DECISIONS.md` para el detalle completo de cada una.
 
@@ -829,24 +919,22 @@ ni eliminado en esta fase.
 
 ## Último commit
 
-- Hash: `6bdec652fd6a569919e2ad4b615a55803a4737f4` (corto: `6bdec65`)
+- Hash: `5c4833da1cb475a164ab0dd08c25c3edccb8638a` (corto: `5c4833d`)
 - Autor: `catlinux <marc.catlinux@gmail.com>`
-- Mensaje: `feat+docs: implementa Integración MCP — Fase 8 (DEC-043 a DEC-047)`
-- Contenido: 33 archivos, 2.401 inserciones/100 eliminaciones — contrato de dominio
-  `ExecutionChannelClient`/`Request`/`Response` en `packages/shared/src/mcp/`;
-  `OperationHashRegistry`/`cancelOperation` y el servidor IPC de Execution en
-  `packages/execution-ssh/src/confirmation/` e `.../ipc/`; servidor MCP completo (paquete nuevo
-  `packages/mcp-server/`, SDK oficial, transporte stdio) con 31 tests nuevos (134 en total);
-  `DEVELOPMENT.md`, `ROADMAP.md`, `STATE.md`, `architecture/ARCHITECTURE.md`/`.en.md`,
-  `decisions/DECISIONS.md` (actualizados con DEC-043 a DEC-047).
-- Commits anteriores: `86571b7` (Fase 7), `b48670d` (Fase 6), `2411dc3` (Fase 5), `624581e`
-  (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1), `d83da17` (Fase 0.7),
-  `c671bef` (Fase 0 + Fase 0.5).
+- Mensaje: `feat+docs: implementa Sessions — Fase 9 (DEC-048 a DEC-051)`
+- Contenido: 17 archivos, 448 inserciones/65 eliminaciones — `SessionId`/`generateSessionId` en
+  `packages/shared/src/session/`; `ExecutionChannelRequest` ampliado con `sessionId` de
+  correlación; propagación en `server.ts`/`tools-call.ts` del servidor MCP con 6 tests nuevos
+  (140 en total); `DEVELOPMENT.md`, `ROADMAP.md`, `STATE.md`, `architecture/ARCHITECTURE.md`/
+  `.en.md`, `decisions/DECISIONS.md` (actualizados con DEC-048 a DEC-051).
+- Commits anteriores: `6bdec65` (Fase 8), `86571b7` (Fase 7), `b48670d` (Fase 6), `2411dc3`
+  (Fase 5), `624581e` (Fase 4), `1399053` (Fase 3), `4e01064` (Fase 2), `2922629` (Fase 1),
+  `d83da17` (Fase 0.7), `c671bef` (Fase 0 + Fase 0.5).
 
 ## Estado del push
 
 - **Realizado** (2026-09-17, con autorización explícita del usuario). `master` sincronizado con
-  `origin/master` (`6bdec65`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
+  `origin/master` (`5c4833d`), working tree limpio (verificado: `HEAD` y `origin/master` apuntan
   al mismo hash).
 
 ## Próxima acción recomendada

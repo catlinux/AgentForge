@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { platform } from "node:os";
 import type {
   ExecutionChannelRequest,
+  OperationId,
   PolicyDecision,
   SchemaFingerprint,
   SessionId,
@@ -15,6 +16,7 @@ import { NetExecutionChannelClient } from "./execution-client.js";
 const identity = "tool-1" as ToolIdentity;
 const fingerprint = "fp-1" as SchemaFingerprint;
 const sessionId = "session-1" as SessionId;
+const operationId = "operation-1" as OperationId;
 
 function testSocketPath(): string {
   // Windows named pipes and POSIX sockets both accept an arbitrary path-like string here for
@@ -42,6 +44,7 @@ function req(): ExecutionChannelRequest {
     parameters: { path: "/a" },
     decision: decision(),
     sessionId,
+    operationId,
   };
 }
 

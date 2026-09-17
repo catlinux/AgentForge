@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ExecutionRequest,
+  OperationId,
   PolicyDecision,
   SchemaFingerprint,
   SecretId,
   SecretRecord,
+  SessionId,
   ToolIdentity,
 } from "@agentforge/shared";
 import type {
@@ -16,7 +18,13 @@ import type { CommandTemplate } from "./config/command-template.js";
 import type { ExecutionConfig, HostEntry } from "./config/host-config.js";
 
 vi.mock("./ssh/client.js", () => ({
-  executeOverSsh: vi.fn(async () => ({ exitCode: 0, stdout: "ok", stderr: "" })),
+  executeOverSsh: vi.fn(async () => ({
+    exitCode: 0,
+    stdout: "ok",
+    stderr: "",
+    stdoutTruncated: false,
+    stderrTruncated: false,
+  })),
 }));
 
 const { execute } = await import("./execute.js");
@@ -24,6 +32,8 @@ const { executeOverSsh } = await import("./ssh/client.js");
 
 const identity = "tool-1" as ToolIdentity;
 const fingerprint = "fp-1" as SchemaFingerprint;
+const sessionId = "session-1" as SessionId;
+const operationId = "operation-1" as OperationId;
 
 const host: HostEntry = {
   hostId: "host-1",
@@ -48,7 +58,14 @@ const sshKeySecret: SecretRecord = {
 };
 
 function makeRequest(overrides: Partial<ExecutionRequest> = {}): ExecutionRequest {
-  return { identity, hostId: "host-1", parameters: { path: "/a" }, ...overrides };
+  return {
+    identity,
+    hostId: "host-1",
+    parameters: { path: "/a" },
+    sessionId,
+    operationId,
+    ...overrides,
+  };
 }
 
 function allowDecision(overrides: Partial<PolicyDecision> = {}): PolicyDecision {
@@ -85,7 +102,14 @@ describe("execute (Fase 7 orchestrator)", () => {
     const deps = makeDeps({ kind: "approved" });
     const result = await execute(makeRequest(), allowDecision(), deps);
 
-    expect(result).toEqual({ kind: "executed", exitCode: 0, stdout: "ok", stderr: "" });
+    expect(result).toEqual({
+      kind: "executed",
+      exitCode: 0,
+      stdout: "ok",
+      stderr: "",
+      stdoutTruncated: false,
+      stderrTruncated: false,
+    });
     expect(deps.confirmationChannel.requestConfirmation).not.toHaveBeenCalled();
   });
 

@@ -164,6 +164,25 @@ Sessions — ver `decisions/DECISIONS.md`.
   `sessionId` de transporte, verificado con el SDK real (DEC-050).
 - **Ubicación:** tipo en `packages/shared`, sin paquete ni proceso propio (DEC-051).
 
+**DECIDIDO (DEC-052 a DEC-057, Fase 10, 2026-09-17):** arquitectura de escritura, formato de
+persistencia, modelo de eventos, minimización de datos, propagación de identificadores, y
+garantías del Audit Log — ver `decisions/DECISIONS.md`.
+
+- **Escritura:** cada proceso (servidor MCP, Execution) escribe sus propios eventos, sin
+  componente dedicado nuevo (DEC-052).
+- **Persistencia:** JSON Lines append-only, un fichero por proceso escritor, permisos
+  restringidos (DEC-053).
+- **Modelo de eventos:** `operationId` nuevo por invocación — distinto de `SessionId` (agrupa
+  toda una sesión) y de `OperationHash` (determinista sobre la tupla de confirmación, puede
+  repetirse entre invocaciones) — propagado a Execution y al contrato de cancelación; `tool-invoked`
+  solo con datos realmente disponibles en ese punto (DEC-054).
+- **Minimización:** nunca secretos/claves SSH/passphrases/errores crudos; stdout/stderr y comando
+  resuelto solo como metadato/hash; parámetros solo como nombres de clave; `hostname`/`username`
+  excluidos en favor de `hostId` (DEC-055).
+- **Propagación conjunta:** `sessionId` y `operationId` viajan juntos, fuera de la lógica de
+  Policy Engine/`OperationHashRegistry`/ejecución (DEC-056).
+- **Garantías:** best effort, nunca bloqueante ni condicionante de la operación real (DEC-057).
+
 ## Cómo ejecutar el proyecto
 
 No aplica todavía — no existe código funcional que ejecutar. Este apartado se completará cuando
